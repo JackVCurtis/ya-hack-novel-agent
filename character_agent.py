@@ -1,4 +1,4 @@
-from llama_stack_client import Agent, LlamaStackClient, AgentEventLogger
+from openai import OpenAI
 from typing import Optional, Dict, Any
 
 
@@ -10,32 +10,21 @@ class CharacterAgent:
     detailed character profiles including physical appearance, personality, goals, and flaws.
     """
     
-    def __init__(self, base_url: str = "http://localhost:8321"):
+    def __init__(self, model: str = "gpt-4o-mini", api_key: str = None):
         """
         Initialize the CharacterAgent.
-        
+
         Args:
-            base_url: The base URL for the LlamaStack client
+            model: The OpenAI model to use (default: gpt-4o-mini)
+            api_key: OpenAI API key (if None, will use environment variable)
         """
-        self.base_url = base_url
-        self.client = None
-        self.model_id = None
-        self.agent = None
-        self._initialize_client()
-    
+        self.model = model
+        self.client = OpenAI(api_key=api_key)
+        self.system_instructions = self._get_instructions()
+
     def _initialize_client(self):
-        """Initialize the LlamaStack client and set up the agent."""
-        self.client = LlamaStackClient(base_url=self.base_url)
-        
-        models = self.client.models.list()
-        self.model_id = next(m for m in models if m.model_type == "llm").identifier
-        
-        self.agent = Agent(
-            self.client,
-            model=self.model_id,
-            instructions=self._get_instructions(),
-            tools=[]
-        )
+        """Initialize the OpenAI client - kept for compatibility."""
+        pass  # No longer needed with OpenAI client
     
     def _get_instructions(self) -> str:
         """Get the specialized instructions for the character creation agent."""
@@ -98,9 +87,6 @@ class CharacterAgent:
         Returns:
             A detailed character description with all requested elements
         """
-        if not self.agent:
-            raise RuntimeError("Agent not properly initialized")
-        
         prompt = self._create_prompt(novel_concept, setting_description, character_role, character_description)
         
         if verbose:
@@ -108,18 +94,17 @@ class CharacterAgent:
             print("CharacterAgent> Novel concept:", novel_concept[:50] + "...")
             print("CharacterAgent> Setting:", setting_description[:50] + "...")
         
-        response = self.agent.create_turn(
-            messages=[{"role": "user", "content": prompt}],
-            session_id=self.agent.create_session(f"character_creation_{character_role}"),
-            stream=True,
+        response = self.client.chat.completions.create(
+            model=self.model,
+            messages=[
+                {"role": "system", "content": self.system_instructions},
+                {"role": "user", "content": prompt}
+            ],
+            temperature=0.7,
+            max_tokens=3000
         )
 
-        # Extract the content from the response
-        result = ""
-        for log in AgentEventLogger().log(response):
-            result += log.content
-        
-        return result.strip()
+        return response.choices[0].message.content.strip()
     
     def _create_prompt(self, novel_concept: str, setting_description: str,
                       character_role: str, character_description: Optional[str] = None) -> str:
@@ -198,13 +183,8 @@ If an initial character description was provided, use it as a foundation but exp
     def update_instructions(self, custom_instructions: str):
         """
         Update the agent's instructions for specialized character creation tasks.
-        
+
         Args:
             custom_instructions: New instructions for the agent
         """
-        self.agent = Agent(
-            self.client,
-            model=self.model_id,
-            instructions=custom_instructions,
-            tools=[]
-        )
+        self.system_instructions = custom_instructions

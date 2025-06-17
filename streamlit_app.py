@@ -249,7 +249,7 @@ def main():
     st.sidebar.title("Navigation")
     page = st.sidebar.selectbox(
         "Choose a step:",
-        ["Story Concept", "World Building", "Character Creation", "Story Outline", "Chapter Writing"]
+        ["Story Concept", "World Building", "Character Creation", "Story Outline", "Chapter Writing", "Edit Content"]
     )
     
     if page == "Story Concept":
@@ -262,6 +262,8 @@ def main():
         story_outline_page()
     elif page == "Chapter Writing":
         chapter_writing_page()
+    elif page == "Edit Content":
+        edit_content_page()
 
 
 def story_concept_page():
@@ -352,7 +354,7 @@ def world_building_page():
         if st.button("🎯 Generate Detailed Setting", type="primary"):
             with st.spinner("Creating your world..."):
                 try:
-                    worldbuilder = WorldbuilderAgent()
+                    worldbuilder = WorldbuilderAgent(model="gpt-4o-mini")
                     detailed_setting = worldbuilder.generate_setting(
                         st.session_state.initial_setting,
                         st.session_state.story_concept,
@@ -368,20 +370,36 @@ def world_building_page():
     with col2:
         st.subheader("Generated Setting")
         if st.session_state.generated_setting:
-            st.write(st.session_state.generated_setting)
-            
+            st.markdown("### 🌍 Your Generated World")
+
+            # Editable text area for the setting
+            edited_setting = st.text_area(
+                "Edit your setting description:",
+                value=st.session_state.generated_setting,
+                height=300,
+                help="You can edit the generated setting description directly here",
+                key="setting_editor"
+            )
+
+            # Update session state if content was edited
+            if edited_setting != st.session_state.generated_setting:
+                st.session_state.generated_setting = edited_setting
+                save_current_story()  # Auto-save changes
+                st.success("✅ Setting updated and saved!")
+
             # Option to regenerate
             if st.button("🔄 Regenerate Setting"):
                 with st.spinner("Regenerating world..."):
                     try:
-                        worldbuilder = WorldbuilderAgent()
+                        worldbuilder = WorldbuilderAgent(model="gpt-4o-mini")
                         detailed_setting = worldbuilder.generate_setting(
                             st.session_state.initial_setting,
                             st.session_state.story_concept,
                             verbose=False
                         )
-                        print(detailed_setting)
                         st.session_state.generated_setting = detailed_setting
+                        save_current_story()  # Auto-save
+                        st.success("✅ Setting regenerated!")
                         st.rerun()
                     except Exception as e:
                         st.error(f"Error regenerating setting: {str(e)}")
@@ -419,7 +437,7 @@ def character_creation_page():
             if character_roles:
                 with st.spinner("Creating your characters..."):
                     try:
-                        character_agent = CharacterAgent()
+                        character_agent = CharacterAgent(model="gpt-4o-mini")
 
                         # Prepare initial character descriptions from story concept page
                         initial_descriptions = {}
@@ -449,9 +467,23 @@ def character_creation_page():
     with col2:
         st.subheader("Generated Characters")
         if st.session_state.generated_characters:
+            # Display each character in an expandable section with editing capability
             for role, description in st.session_state.generated_characters.items():
-                with st.expander(f"📖 {role.title()}"):
-                    st.write(description)
+                with st.expander(f"📖 {role.title().replace('_', ' ')}", expanded=True):
+                    # Editable text area for each character
+                    edited_character = st.text_area(
+                        f"Edit {role.title().replace('_', ' ')} description:",
+                        value=description,
+                        height=200,
+                        help=f"You can edit the {role} description directly here",
+                        key=f"character_editor_{role}"
+                    )
+
+                    # Update session state if content was edited
+                    if edited_character != description:
+                        st.session_state.generated_characters[role] = edited_character
+                        save_current_story()  # Auto-save changes
+                        st.success(f"✅ {role.title().replace('_', ' ')} updated and saved!")
             
             # Option to regenerate specific characters
             st.subheader("Regenerate Individual Characters")
@@ -463,7 +495,7 @@ def character_creation_page():
             if st.button(f"🔄 Regenerate {role_to_regen.title()}"):
                 with st.spinner(f"Regenerating {role_to_regen}..."):
                     try:
-                        character_agent = CharacterAgent()
+                        character_agent = CharacterAgent(model="gpt-4o-mini")
 
                         # Use initial description if available
                         initial_desc = None
@@ -516,7 +548,7 @@ def story_outline_page():
         if st.button("📚 Generate 17-Chapter Outline", type="primary"):
             with st.spinner("Creating your story outline..."):
                 try:
-                    outliner = OutlinerAgent()
+                    outliner = OutlinerAgent(model="gpt-4o-mini")
                     outline = outliner.generate_outline(
                         st.session_state.story_concept,
                         st.session_state.generated_setting,
@@ -533,13 +565,28 @@ def story_outline_page():
     with col2:
         st.subheader("Generated Outline")
         if st.session_state.generated_outline:
-            st.write(st.session_state.generated_outline)
-            
+            st.markdown("### 📋 Your Story Outline")
+
+            # Editable text area for the outline
+            edited_outline = st.text_area(
+                "Edit your story outline:",
+                value=st.session_state.generated_outline,
+                height=400,
+                help="You can edit the generated outline directly here",
+                key="outline_editor"
+            )
+
+            # Update session state if content was edited
+            if edited_outline != st.session_state.generated_outline:
+                st.session_state.generated_outline = edited_outline
+                save_current_story()  # Auto-save changes
+                st.success("✅ Outline updated and saved!")
+
             # Option to regenerate
             if st.button("🔄 Regenerate Outline"):
                 with st.spinner("Regenerating outline..."):
                     try:
-                        outliner = OutlinerAgent()
+                        outliner = OutlinerAgent(model="gpt-4o-mini")
                         outline = outliner.generate_outline(
                             st.session_state.story_concept,
                             st.session_state.generated_setting,
@@ -547,6 +594,8 @@ def story_outline_page():
                             verbose=False
                         )
                         st.session_state.generated_outline = outline
+                        save_current_story()  # Auto-save
+                        st.success("✅ Outline regenerated!")
                         st.rerun()
                     except Exception as e:
                         st.error(f"Error regenerating outline: {str(e)}")
@@ -588,8 +637,8 @@ def chapter_writing_page():
         if st.button(f"✍️ Write Chapter {chapter_number}", type="primary"):
             with st.spinner(f"Writing Chapter {chapter_number}..."):
                 try:
-                    chapter_writer = ChapterAgent()
-                    
+                    chapter_writer = ChapterAgent(model="gpt-4o-mini")
+
                     # Get previous chapter if it exists
                     previous_chapter = None
                     if chapter_number > 1 and (chapter_number - 1) in st.session_state.generated_chapters:
@@ -614,25 +663,226 @@ def chapter_writing_page():
     
     with col2:
         st.subheader("Generated Chapters")
-        
+
         if st.session_state.generated_chapters:
             # Show list of completed chapters
             completed_chapters = sorted(st.session_state.generated_chapters.keys())
             st.write(f"**Completed Chapters:** {', '.join(map(str, completed_chapters))}")
-            
-            # Chapter viewer
+
+            # Chapter viewer and editor
             if completed_chapters:
                 view_chapter = st.selectbox(
-                    "View chapter:",
+                    "View/Edit chapter:",
                     options=completed_chapters,
-                    format_func=lambda x: f"Chapter {x}"
+                    format_func=lambda x: f"Chapter {x}",
+                    key="chapter_selector"
                 )
-                
+
                 if view_chapter in st.session_state.generated_chapters:
-                    st.subheader(f"Chapter {view_chapter}")
-                    st.write(st.session_state.generated_chapters[view_chapter])
+                    st.subheader(f"📖 Chapter {view_chapter}")
+
+                    # Editable text area for the chapter
+                    edited_chapter = st.text_area(
+                        f"Edit Chapter {view_chapter}:",
+                        value=st.session_state.generated_chapters[view_chapter],
+                        height=500,
+                        help=f"You can edit Chapter {view_chapter} directly here",
+                        key=f"chapter_editor_{view_chapter}"
+                    )
+
+                    # Update session state if content was edited
+                    if edited_chapter != st.session_state.generated_chapters[view_chapter]:
+                        st.session_state.generated_chapters[view_chapter] = edited_chapter
+                        save_current_story()  # Auto-save changes
+                        st.success(f"✅ Chapter {view_chapter} updated and saved!")
+
+                    # Option to delete chapter
+                    if st.button(f"🗑️ Delete Chapter {view_chapter}", type="secondary"):
+                        del st.session_state.generated_chapters[view_chapter]
+                        save_current_story()  # Auto-save changes
+                        st.success(f"✅ Chapter {view_chapter} deleted!")
+                        st.rerun()
         else:
             st.info("No chapters written yet. Select a chapter number and click 'Write Chapter' to begin.")
+
+
+def edit_content_page():
+    """Dedicated page for editing all generated content"""
+    st.header("✏️ Edit Content")
+    st.markdown("Edit all your generated story content in one place.")
+
+    # Check if any content exists
+    has_content = any([
+        st.session_state.get('generated_setting'),
+        st.session_state.get('generated_characters'),
+        st.session_state.get('generated_outline'),
+        st.session_state.get('generated_chapters')
+    ])
+
+    if not has_content:
+        st.warning("⚠️ No generated content found. Please generate content in the other sections first.")
+        return
+
+    # Create tabs for different content types
+    tabs = st.tabs(["🌍 Setting", "👥 Characters", "📋 Outline", "📖 Chapters"])
+
+    # Setting Tab
+    with tabs[0]:
+        if st.session_state.get('generated_setting'):
+            st.subheader("World Setting")
+            edited_setting = st.text_area(
+                "Edit your world setting:",
+                value=st.session_state.generated_setting,
+                height=400,
+                help="Edit your world description here",
+                key="edit_page_setting"
+            )
+
+            if edited_setting != st.session_state.generated_setting:
+                st.session_state.generated_setting = edited_setting
+                save_current_story()
+                st.success("✅ Setting updated!")
+        else:
+            st.info("No setting generated yet. Go to 'World Building' to create one.")
+
+    # Characters Tab
+    with tabs[1]:
+        if st.session_state.get('generated_characters'):
+            st.subheader("Character Profiles")
+            for role, description in st.session_state.generated_characters.items():
+                st.markdown(f"### {role.title().replace('_', ' ')}")
+                edited_character = st.text_area(
+                    f"Edit {role.title().replace('_', ' ')}:",
+                    value=description,
+                    height=250,
+                    help=f"Edit the {role} description here",
+                    key=f"edit_page_character_{role}"
+                )
+
+                if edited_character != description:
+                    st.session_state.generated_characters[role] = edited_character
+                    save_current_story()
+                    st.success(f"✅ {role.title().replace('_', ' ')} updated!")
+
+                st.markdown("---")
+        else:
+            st.info("No characters generated yet. Go to 'Character Creation' to create them.")
+
+    # Outline Tab
+    with tabs[2]:
+        if st.session_state.get('generated_outline'):
+            st.subheader("Story Outline")
+            edited_outline = st.text_area(
+                "Edit your story outline:",
+                value=st.session_state.generated_outline,
+                height=500,
+                help="Edit your 17-chapter outline here",
+                key="edit_page_outline"
+            )
+
+            if edited_outline != st.session_state.generated_outline:
+                st.session_state.generated_outline = edited_outline
+                save_current_story()
+                st.success("✅ Outline updated!")
+        else:
+            st.info("No outline generated yet. Go to 'Story Outline' to create one.")
+
+    # Chapters Tab
+    with tabs[3]:
+        if st.session_state.get('generated_chapters'):
+            st.subheader("Chapters")
+            completed_chapters = sorted(st.session_state.generated_chapters.keys())
+
+            if completed_chapters:
+                selected_chapter = st.selectbox(
+                    "Select chapter to edit:",
+                    options=completed_chapters,
+                    format_func=lambda x: f"Chapter {x}",
+                    key="edit_page_chapter_selector"
+                )
+
+                if selected_chapter:
+                    st.markdown(f"### Chapter {selected_chapter}")
+                    edited_chapter = st.text_area(
+                        f"Edit Chapter {selected_chapter}:",
+                        value=st.session_state.generated_chapters[selected_chapter],
+                        height=600,
+                        help=f"Edit Chapter {selected_chapter} content here",
+                        key=f"edit_page_chapter_{selected_chapter}"
+                    )
+
+                    if edited_chapter != st.session_state.generated_chapters[selected_chapter]:
+                        st.session_state.generated_chapters[selected_chapter] = edited_chapter
+                        save_current_story()
+                        st.success(f"✅ Chapter {selected_chapter} updated!")
+
+                    # Delete chapter option
+                    if st.button(f"🗑️ Delete Chapter {selected_chapter}", type="secondary", key=f"delete_chapter_{selected_chapter}"):
+                        del st.session_state.generated_chapters[selected_chapter]
+                        save_current_story()
+                        st.success(f"✅ Chapter {selected_chapter} deleted!")
+                        st.rerun()
+            else:
+                st.info("No chapters written yet.")
+        else:
+            st.info("No chapters written yet. Go to 'Chapter Writing' to create them.")
+
+    # Export options
+    st.markdown("---")
+    st.subheader("📤 Export Options")
+
+    col1, col2, col3 = st.columns(3)
+
+    with col1:
+        if st.button("📋 Copy All Content"):
+            all_content = []
+            if st.session_state.get('story_concept'):
+                all_content.append(f"**STORY CONCEPT:**\n{st.session_state.story_concept}\n")
+            if st.session_state.get('generated_setting'):
+                all_content.append(f"**SETTING:**\n{st.session_state.generated_setting}\n")
+            if st.session_state.get('generated_characters'):
+                all_content.append("**CHARACTERS:**")
+                for role, desc in st.session_state.generated_characters.items():
+                    all_content.append(f"\n{role.title().replace('_', ' ')}:\n{desc}\n")
+            if st.session_state.get('generated_outline'):
+                all_content.append(f"**OUTLINE:**\n{st.session_state.generated_outline}\n")
+            if st.session_state.get('generated_chapters'):
+                all_content.append("**CHAPTERS:**")
+                for chapter_num in sorted(st.session_state.generated_chapters.keys()):
+                    all_content.append(f"\nChapter {chapter_num}:\n{st.session_state.generated_chapters[chapter_num]}\n")
+
+            full_text = "\n".join(all_content)
+            st.text_area("Copy this content:", value=full_text, height=200)
+
+    with col2:
+        if st.button("💾 Download as Text"):
+            all_content = []
+            if st.session_state.get('story_concept'):
+                all_content.append(f"STORY CONCEPT:\n{st.session_state.story_concept}\n\n")
+            if st.session_state.get('generated_setting'):
+                all_content.append(f"SETTING:\n{st.session_state.generated_setting}\n\n")
+            if st.session_state.get('generated_characters'):
+                all_content.append("CHARACTERS:\n")
+                for role, desc in st.session_state.generated_characters.items():
+                    all_content.append(f"{role.title().replace('_', ' ')}:\n{desc}\n\n")
+            if st.session_state.get('generated_outline'):
+                all_content.append(f"OUTLINE:\n{st.session_state.generated_outline}\n\n")
+            if st.session_state.get('generated_chapters'):
+                all_content.append("CHAPTERS:\n\n")
+                for chapter_num in sorted(st.session_state.generated_chapters.keys()):
+                    all_content.append(f"Chapter {chapter_num}:\n{st.session_state.generated_chapters[chapter_num]}\n\n")
+
+            full_text = "".join(all_content)
+            st.download_button(
+                label="📥 Download Story",
+                data=full_text,
+                file_name=f"{st.session_state.get('story_title', 'story')}.txt",
+                mime="text/plain"
+            )
+
+    with col3:
+        if st.button("🔄 Refresh All"):
+            st.rerun()
 
 
 if __name__ == "__main__":

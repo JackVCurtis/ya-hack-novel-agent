@@ -196,9 +196,9 @@ def demo_full_story_pipeline():
     """Demonstrate all three agents working together to create a complete story foundation"""
 
     # Initialize all agents
-    worldbuilder = WorldbuilderAgent()
-    character_agent = CharacterAgent()
-    outliner = OutlinerAgent()
+    worldbuilder = WorldbuilderAgent(model="gpt-4o-mini")
+    character_agent = CharacterAgent(model="gpt-4o-mini")
+    outliner = OutlinerAgent(model="gpt-4o-mini")
 
     # Define the story concept
     concept = """A story about a seemingly powerless student at a magical academy who discovers
@@ -256,7 +256,7 @@ def demo_full_story_pipeline():
 def demo_detailed_chapter():
     """Demonstrate detailed chapter breakdown functionality"""
 
-    outliner = OutlinerAgent()
+    outliner = OutlinerAgent(model="gpt-4o-mini")
 
     # Simplified inputs for chapter detail demo
     concept = "A powerless student discovers dangerous magical abilities"
@@ -287,7 +287,7 @@ def demo_chapter_writing():
     """Demonstrate the ChapterAgent writing a complete chapter"""
 
     # Initialize chapter writer
-    chapter_writer = ChapterAgent()
+    chapter_writer = ChapterAgent(model="gpt-4o-mini")
 
     setting = """Aethermoor Academy floats serenely above the Shattered Lands, a
     post-apocalyptic wasteland where magic once ran wild. The academy's crystal spires

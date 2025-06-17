@@ -1,4 +1,4 @@
-from llama_stack_client import Agent, LlamaStackClient, AgentEventLogger
+from openai import OpenAI
 from typing import Dict, Optional
 
 
@@ -11,32 +11,21 @@ class ChapterAgent:
     opening, rising action, and falling action.
     """
     
-    def __init__(self, base_url: str = "http://localhost:8321"):
+    def __init__(self, model: str = "gpt-4o-mini", api_key: str = None):
         """
         Initialize the ChapterAgent.
-        
+
         Args:
-            base_url: The base URL for the LlamaStack client
+            model: The OpenAI model to use (default: gpt-4o-mini)
+            api_key: OpenAI API key (if None, will use environment variable)
         """
-        self.base_url = base_url
-        self.client = None
-        self.model_id = None
-        self.agent = None
-        self._initialize_client()
-    
+        self.model = model
+        self.client = OpenAI(api_key=api_key)
+        self.system_instructions = self._get_instructions()
+
     def _initialize_client(self):
-        """Initialize the LlamaStack client and set up the agent."""
-        self.client = LlamaStackClient(base_url=self.base_url)
-        
-        models = self.client.models.list()
-        self.model_id = next(m for m in models if m.model_type == "llm").identifier
-        
-        self.agent = Agent(
-            self.client,
-            model=self.model_id,
-            instructions=self._get_instructions(),
-            tools=[]
-        )
+        """Initialize the OpenAI client - kept for compatibility."""
+        pass  # No longer needed with OpenAI client
     
     def _get_instructions(self) -> str:
         """Get the specialized instructions for the chapter writing agent."""
@@ -106,8 +95,6 @@ class ChapterAgent:
         Returns:
             A complete chapter with proper structure and pacing
         """
-        if not self.agent:
-            raise RuntimeError("Agent not properly initialized")
         
         prompt = self._create_prompt(
             chapter_outline, characters, setting_description, 
@@ -118,18 +105,17 @@ class ChapterAgent:
             print(f"ChapterAgent> Writing Chapter {chapter_number}...")
             print("ChapterAgent> Processing outline and character details...")
         
-        response = self.agent.create_turn(
-            messages=[{"role": "user", "content": prompt}],
-            session_id=self.agent.create_session(f"chapter_{chapter_number}_writing"),
-            stream=True,
+        response = self.client.chat.completions.create(
+            model=self.model,
+            messages=[
+                {"role": "system", "content": self.system_instructions},
+                {"role": "user", "content": prompt}
+            ],
+            temperature=0.7,
+            max_tokens=4000  # Chapters need more tokens
         )
 
-        # Extract the content from the response
-        result = ""
-        for log in AgentEventLogger().log(response):
-            result += log.content
-        
-        return result.strip()
+        return response.choices[0].message.content.strip()
     
     def _create_prompt(self, chapter_outline: str, characters: Dict[str, str],
                       setting_description: str, chapter_number: int,
@@ -244,28 +230,23 @@ Please write the complete chapter now."""
         if verbose:
             print(f"ChapterAgent> Writing Chapter {chapter_number} from {pov_character}'s POV...")
         
-        response = self.agent.create_turn(
-            messages=[{"role": "user", "content": pov_prompt}],
-            session_id=self.agent.create_session(f"chapter_{chapter_number}_{pov_character}_pov"),
-            stream=True,
+        response = self.client.chat.completions.create(
+            model=self.model,
+            messages=[
+                {"role": "system", "content": self.system_instructions},
+                {"role": "user", "content": pov_prompt}
+            ],
+            temperature=0.7,
+            max_tokens=4000  # Chapters need more tokens
         )
 
-        result = ""
-        for log in AgentEventLogger().log(response):
-            result += log.content
-        
-        return result.strip()
+        return response.choices[0].message.content.strip()
     
     def update_instructions(self, custom_instructions: str):
         """
         Update the agent's instructions for specialized chapter writing tasks.
-        
+
         Args:
             custom_instructions: New instructions for the agent
         """
-        self.agent = Agent(
-            self.client,
-            model=self.model_id,
-            instructions=custom_instructions,
-            tools=[]
-        )
+        self.system_instructions = custom_instructions

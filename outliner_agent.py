@@ -1,4 +1,4 @@
-from llama_stack_client import Agent, LlamaStackClient, AgentEventLogger
+from openai import OpenAI
 from typing import Dict, List
 
 
@@ -10,32 +10,21 @@ class OutlinerAgent:
     to produce a 17-chapter outline following the Hero's Journey structure.
     """
     
-    def __init__(self, base_url: str = "http://localhost:8321"):
+    def __init__(self, model: str = "gpt-4o-mini", api_key: str = None):
         """
         Initialize the OutlinerAgent.
-        
+
         Args:
-            base_url: The base URL for the LlamaStack client
+            model: The OpenAI model to use (default: gpt-4o-mini)
+            api_key: OpenAI API key (if None, will use environment variable)
         """
-        self.base_url = base_url
-        self.client = None
-        self.model_id = None
-        self.agent = None
-        self._initialize_client()
-    
+        self.model = model
+        self.client = OpenAI(api_key=api_key)
+        self.system_instructions = self._get_instructions()
+
     def _initialize_client(self):
-        """Initialize the LlamaStack client and set up the agent."""
-        self.client = LlamaStackClient(base_url=self.base_url)
-        
-        models = self.client.models.list()
-        self.model_id = next(m for m in models if m.model_type == "llm").identifier
-        
-        self.agent = Agent(
-            self.client,
-            model=self.model_id,
-            instructions=self._get_instructions(),
-            tools=[]
-        )
+        """Initialize the OpenAI client - kept for compatibility."""
+        pass  # No longer needed with OpenAI client
     
     def _get_instructions(self) -> str:
         """Get the specialized instructions for the outline creation agent."""
@@ -92,42 +81,38 @@ class OutlinerAgent:
         - Integration of setting elements
         - Utilization of all major characters"""
     
-    def generate_outline(self, novel_concept: str, setting_description: str, 
+    def generate_outline(self, novel_concept: str, setting_description: str,
                         characters: Dict[str, str], verbose: bool = True) -> str:
         """
         Generate a 17-chapter outline following the Hero's Journey structure.
-        
+
         Args:
             novel_concept: The overall concept/theme of the novel
             setting_description: Description of the novel's setting/world
             characters: Dictionary of character roles and their descriptions
             verbose: Whether to print progress messages
-            
+
         Returns:
             A structured 17-chapter outline
         """
-        if not self.agent:
-            raise RuntimeError("Agent not properly initialized")
-        
         prompt = self._create_prompt(novel_concept, setting_description, characters)
-        
+
         if verbose:
             print("OutlinerAgent> Creating 17-chapter outline...")
             print("OutlinerAgent> Novel concept:", novel_concept[:50] + "...")
             print("OutlinerAgent> Characters:", list(characters.keys()))
-        
-        response = self.agent.create_turn(
-            messages=[{"role": "user", "content": prompt}],
-            session_id=self.agent.create_session("outline_creation"),
-            stream=True,
+
+        response = self.client.chat.completions.create(
+            model=self.model,
+            messages=[
+                {"role": "system", "content": self.system_instructions},
+                {"role": "user", "content": prompt}
+            ],
+            temperature=0.7,
+            max_tokens=4000
         )
 
-        # Extract the content from the response
-        result = ""
-        for log in AgentEventLogger().log(response):
-            result += log.content
-        
-        return result.strip()
+        return response.choices[0].message.content.strip()
     
     def _create_prompt(self, novel_concept: str, setting_description: str, 
                       characters: Dict[str, str]) -> str:
@@ -237,29 +222,24 @@ Focus on creating a compelling, detailed chapter that serves its role in the Her
         if verbose:
             print(f"OutlinerAgent> Creating detailed breakdown for Chapter {chapter_number}")
             print(f"OutlinerAgent> Hero's Journey Stage: {stage}")
-        
-        response = self.agent.create_turn(
-            messages=[{"role": "user", "content": prompt}],
-            session_id=self.agent.create_session(f"chapter_{chapter_number}_detail"),
-            stream=True,
+
+        response = self.client.chat.completions.create(
+            model=self.model,
+            messages=[
+                {"role": "system", "content": self.system_instructions},
+                {"role": "user", "content": prompt}
+            ],
+            temperature=0.7,
+            max_tokens=2000
         )
 
-        result = ""
-        for log in AgentEventLogger().log(response):
-            result += log.content
-        
-        return result.strip()
+        return response.choices[0].message.content.strip()
     
     def update_instructions(self, custom_instructions: str):
         """
         Update the agent's instructions for specialized outlining tasks.
-        
+
         Args:
             custom_instructions: New instructions for the agent
         """
-        self.agent = Agent(
-            self.client,
-            model=self.model_id,
-            instructions=custom_instructions,
-            tools=[]
-        )
+        self.system_instructions = custom_instructions
