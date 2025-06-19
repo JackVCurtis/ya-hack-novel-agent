@@ -245,25 +245,224 @@ def main():
                 st.session_state.get('generated_characters'), st.session_state.get('generated_outline')]):
             save_current_story()
 
-    # Navigation
-    st.sidebar.title("Navigation")
-    page = st.sidebar.selectbox(
-        "Choose a step:",
-        ["Story Concept", "World Building", "Character Creation", "Story Outline", "Chapter Writing", "Edit Content"]
-    )
-    
-    if page == "Story Concept":
+    # Export functionality
+    st.sidebar.subheader("📤 Export Story")
+
+    # Check if story has content to export
+    has_exportable_content = any([
+        st.session_state.get('story_concept'),
+        st.session_state.get('generated_setting'),
+        st.session_state.get('generated_characters'),
+        st.session_state.get('generated_outline'),
+        st.session_state.get('generated_chapters')
+    ])
+
+    if has_exportable_content:
+        # Show story completion status
+        completion_items = []
+        if st.session_state.get('story_concept'):
+            completion_items.append("✅ Story Concept")
+        if st.session_state.get('generated_setting'):
+            completion_items.append("✅ Setting")
+        if st.session_state.get('generated_characters'):
+            completion_items.append("✅ Characters")
+        if st.session_state.get('generated_outline'):
+            completion_items.append("✅ Outline")
+        if st.session_state.get('generated_chapters'):
+            chapter_count = len(st.session_state.generated_chapters)
+            completion_items.append(f"✅ Chapters ({chapter_count}/17)")
+
+        # Show completion status in a compact format
+        with st.sidebar.expander("📋 Story Status", expanded=False):
+            for item in completion_items:
+                st.sidebar.write(item)
+
+        # Export button
+        if st.sidebar.button("📖 Export as Markdown", type="primary", help="Export complete story as a markdown document with table of contents"):
+            with st.spinner("Generating markdown document..."):
+                try:
+                    markdown_content = generate_markdown_export()
+                    if markdown_content:
+                        # Create filename
+                        safe_title = "".join(c for c in st.session_state.get('story_title', 'story') if c.isalnum() or c in (' ', '-', '_')).rstrip()
+                        filename = f"{safe_title.replace(' ', '_')}.md"
+
+                        # Provide download button
+                        st.sidebar.download_button(
+                            label="💾 Download Markdown",
+                            data=markdown_content,
+                            file_name=filename,
+                            mime="text/markdown",
+                            help="Click to download your story as a markdown file"
+                        )
+                        st.sidebar.success("✅ Markdown generated! Click download button above.")
+                    else:
+                        st.sidebar.error("❌ Failed to generate markdown content.")
+                except Exception as e:
+                    st.sidebar.error(f"❌ Export error: {str(e)}")
+    else:
+        st.sidebar.info("📝 Create story content to enable export.")
+
+    # Initialize current step in session state if not exists
+    if 'current_step' not in st.session_state:
+        st.session_state.current_step = "Story Concept"
+
+    # Render navigation header and route to appropriate page
+    render_navigation_header()
+
+    # Route to appropriate page based on current step
+    current_step = st.session_state.current_step
+    if current_step == "Story Concept":
         story_concept_page()
-    elif page == "World Building":
+    elif current_step == "World Building":
         world_building_page()
-    elif page == "Character Creation":
+    elif current_step == "Character Creation":
         character_creation_page()
-    elif page == "Story Outline":
+    elif current_step == "Story Outline":
         story_outline_page()
-    elif page == "Chapter Writing":
+    elif current_step == "Chapter Writing":
         chapter_writing_page()
-    elif page == "Edit Content":
+    elif current_step == "Edit Content":
         edit_content_page()
+
+
+def render_navigation_header():
+    """Render the horizontal navigation header in the main content area"""
+
+    # Define steps and their requirements
+    steps = [
+        {
+            "name": "Story Concept",
+            "icon": "📝",
+            "description": "Define your story",
+            "required": None,
+            "completed": bool(st.session_state.get('story_concept'))
+        },
+        {
+            "name": "World Building",
+            "icon": "🌍",
+            "description": "Create your world",
+            "required": "story_concept",
+            "completed": bool(st.session_state.get('generated_setting'))
+        },
+        {
+            "name": "Character Creation",
+            "icon": "👥",
+            "description": "Develop characters",
+            "required": "generated_setting",
+            "completed": bool(st.session_state.get('generated_characters'))
+        },
+        {
+            "name": "Story Outline",
+            "icon": "📋",
+            "description": "Plan your story",
+            "required": "generated_characters",
+            "completed": bool(st.session_state.get('generated_outline'))
+        },
+        {
+            "name": "Chapter Writing",
+            "icon": "✍️",
+            "description": "Write your chapters",
+            "required": "generated_outline",
+            "completed": bool(st.session_state.get('generated_chapters'))
+        },
+        {
+            "name": "Edit Content",
+            "icon": "✏️",
+            "description": "Review and edit",
+            "required": None,  # Always available if any content exists
+            "completed": False  # Never marked as "completed"
+        }
+    ]
+
+    # Create navigation header
+    st.markdown("### 📋 Story Development Steps")
+
+    # Create columns for horizontal layout
+    nav_cols = st.columns(len(steps))
+
+    # Render each step as a column
+    for i, step in enumerate(steps):
+        with nav_cols[i]:
+            step_number = i + 1
+
+            # Check if step is available
+            if step["required"]:
+                is_available = bool(st.session_state.get(step["required"]))
+            else:
+                # Story Concept is always available, Edit Content available if any content exists
+                if step["name"] == "Story Concept":
+                    is_available = True
+                elif step["name"] == "Edit Content":
+                    is_available = any([
+                        st.session_state.get('story_concept'),
+                        st.session_state.get('generated_setting'),
+                        st.session_state.get('generated_characters'),
+                        st.session_state.get('generated_outline'),
+                        st.session_state.get('generated_chapters')
+                    ])
+                else:
+                    is_available = True
+
+            # Create button styling based on state
+            if step["completed"]:
+                status_icon = "✅"
+                button_type = "secondary"
+            elif st.session_state.current_step == step["name"]:
+                status_icon = "🔄"
+                button_type = "primary"
+            elif is_available:
+                status_icon = "⭕"
+                button_type = "secondary"
+            else:
+                status_icon = "⏸️"
+                button_type = "secondary"
+
+            # Create compact button label for horizontal layout
+            button_label = f"{step_number}. {status_icon}"
+
+            # Create button with appropriate state
+            if is_available:
+                if st.button(
+                    button_label,
+                    type=button_type,
+                    help=f"{step['icon']} {step['name']}: {step['description']}",
+                    key=f"nav_step_{step['name']}",
+                    use_container_width=True
+                ):
+                    st.session_state.current_step = step["name"]
+                    st.rerun()
+            else:
+                # Disabled button (show but don't make clickable)
+                st.button(
+                    button_label,
+                    type=button_type,
+                    help=f"{step['icon']} {step['name']}: Complete previous steps first",
+                    key=f"nav_step_disabled_{step['name']}",
+                    disabled=True,
+                    use_container_width=True
+                )
+
+            # Add step name and icon below button
+            if st.session_state.current_step == step["name"]:
+                st.markdown(f"**{step['icon']} {step['name']}**")
+            else:
+                st.markdown(f"{step['icon']} {step['name']}")
+
+    # Add progress indicator
+    completed_steps = sum(1 for step in steps[:-1] if step["completed"])  # Exclude "Edit Content"
+    total_steps = len(steps) - 1  # Exclude "Edit Content" from count
+    progress_percentage = (completed_steps / total_steps) * 100
+
+    # Progress bar spanning full width
+    st.markdown("---")
+    col1, col2 = st.columns([3, 1])
+    with col1:
+        st.progress(progress_percentage / 100)
+    with col2:
+        st.write(f"**{completed_steps}/{total_steps} completed**")
+
+    st.markdown("---")
 
 
 def story_concept_page():
@@ -603,6 +802,156 @@ def story_outline_page():
             st.info("Click 'Generate 17-Chapter Outline' to create your story structure.")
 
 
+def generate_markdown_export():
+    """Generate a complete markdown document with table of contents"""
+    if not st.session_state.get('story_title'):
+        return None
+
+    markdown_content = []
+
+    # Title
+    title = st.session_state.get('story_title', 'Untitled Story')
+    markdown_content.append(f"# {title}\n")
+
+    # Add metadata if available
+    if st.session_state.get('story_concept'):
+        markdown_content.append("*A Young Adult Novel*\n")
+
+    markdown_content.append("---\n")
+
+    # Table of Contents
+    markdown_content.append("## Table of Contents\n")
+
+    # Add story elements to TOC
+    toc_items = []
+    if st.session_state.get('story_concept'):
+        toc_items.append("- [Story Concept](#story-concept)")
+    if st.session_state.get('generated_setting'):
+        toc_items.append("- [Setting](#setting)")
+    if st.session_state.get('generated_characters'):
+        toc_items.append("- [Characters](#characters)")
+        for role in st.session_state.generated_characters.keys():
+            role_title = role.title().replace('_', ' ')
+            role_anchor = role.lower().replace(' ', '-').replace('_', '-')
+            toc_items.append(f"  - [{role_title}](#{role_anchor})")
+    if st.session_state.get('generated_outline'):
+        toc_items.append("- [Story Outline](#story-outline)")
+
+    # Add chapters to TOC
+    if st.session_state.get('generated_chapters'):
+        toc_items.append("- [Chapters](#chapters)")
+        completed_chapters = sorted(st.session_state.generated_chapters.keys())
+        for chapter_num in completed_chapters:
+            toc_items.append(f"  - [Chapter {chapter_num}](#chapter-{chapter_num})")
+
+    markdown_content.extend(toc_items)
+    markdown_content.append("\n---\n")
+
+    # Story Concept
+    if st.session_state.get('story_concept'):
+        markdown_content.append("## Story Concept\n")
+        markdown_content.append(f"{st.session_state.story_concept}\n\n")
+
+    # Setting
+    if st.session_state.get('generated_setting'):
+        markdown_content.append("## Setting\n")
+        markdown_content.append(f"{st.session_state.generated_setting}\n\n")
+
+    # Characters
+    if st.session_state.get('generated_characters'):
+        markdown_content.append("## Characters\n")
+        for role, description in st.session_state.generated_characters.items():
+            role_title = role.title().replace('_', ' ')
+            role_anchor = role.lower().replace(' ', '-').replace('_', '-')
+            markdown_content.append(f"### {role_title} {{#{role_anchor}}}\n")
+            markdown_content.append(f"{description}\n\n")
+
+    # Story Outline
+    if st.session_state.get('generated_outline'):
+        markdown_content.append("## Story Outline\n")
+        markdown_content.append(f"{st.session_state.generated_outline}\n\n")
+
+    # Chapters
+    if st.session_state.get('generated_chapters'):
+        markdown_content.append("## Chapters\n")
+        completed_chapters = sorted(st.session_state.generated_chapters.keys())
+        for chapter_num in completed_chapters:
+            chapter_content = st.session_state.generated_chapters[chapter_num]
+            markdown_content.append(f"### Chapter {chapter_num} {{#chapter-{chapter_num}}}\n")
+            markdown_content.append(f"{chapter_content}\n\n")
+            markdown_content.append("---\n")  # Separator between chapters
+
+    return "\n".join(markdown_content)
+
+
+def generate_all_chapters(chapters_to_generate):
+    """Generate multiple chapters sequentially"""
+    if not chapters_to_generate:
+        return
+
+    # Sort chapters to generate them in order
+    sorted_chapters = sorted(chapters_to_generate)
+    total_chapters = len(sorted_chapters)
+
+    # Create a progress bar
+    progress_bar = st.progress(0)
+    status_text = st.empty()
+
+    try:
+        chapter_writer = ChapterAgent(model="gpt-4o-mini")
+
+        for i, chapter_number in enumerate(sorted_chapters):
+            # Update progress
+            progress = (i) / total_chapters
+            progress_bar.progress(progress)
+            status_text.text(f"Writing Chapter {chapter_number}... ({i + 1}/{total_chapters})")
+
+            # Get previous chapter if it exists
+            previous_chapter = None
+            if chapter_number > 1 and (chapter_number - 1) in st.session_state.generated_chapters:
+                previous_chapter = st.session_state.generated_chapters[chapter_number - 1]
+
+            # Generate the chapter
+            chapter = chapter_writer.write_chapter(
+                chapter_outline=st.session_state.generated_outline,
+                characters=st.session_state.generated_characters,
+                setting_description=st.session_state.generated_setting,
+                chapter_number=chapter_number,
+                previous_chapter=previous_chapter,
+                verbose=False
+            )
+
+            # Store the chapter
+            st.session_state.generated_chapters[chapter_number] = chapter
+
+            # Save progress after each chapter
+            save_current_story()
+
+            # Update progress
+            progress = (i + 1) / total_chapters
+            progress_bar.progress(progress)
+
+        # Final status update
+        status_text.text(f"✅ Successfully generated {total_chapters} chapters!")
+        st.success(f"🎉 All {total_chapters} chapters have been generated successfully!")
+        st.info("💾 Story automatically saved to database.")
+
+        # Clear progress indicators after a moment
+        import time
+        time.sleep(2)
+        progress_bar.empty()
+        status_text.empty()
+
+        # Refresh the page to show updated content
+        st.rerun()
+
+    except Exception as e:
+        progress_bar.empty()
+        status_text.empty()
+        st.error(f"❌ Error generating chapters: {str(e)}")
+        st.info("💾 Progress has been saved up to the point of failure.")
+
+
 def chapter_writing_page():
     """Page for writing individual chapters"""
     st.header("✍️ Chapter Writing")
@@ -643,7 +992,7 @@ def chapter_writing_page():
                     previous_chapter = None
                     if chapter_number > 1 and (chapter_number - 1) in st.session_state.generated_chapters:
                         previous_chapter = st.session_state.generated_chapters[chapter_number - 1]
-                    
+
                     # Using the full outline for now - in a real app, you'd extract the specific chapter outline
                     chapter = chapter_writer.write_chapter(
                         chapter_outline=st.session_state.generated_outline,
@@ -653,20 +1002,91 @@ def chapter_writing_page():
                         previous_chapter=previous_chapter,
                         verbose=False
                     )
-                    
+
                     st.session_state.generated_chapters[chapter_number] = chapter
                     save_current_story()  # Auto-save
                     st.success(f"✅ Chapter {chapter_number} complete!")
                     st.info("💾 Story automatically saved to database.")
                 except Exception as e:
                     st.error(f"Error writing chapter: {str(e)}")
+
+        # Add separator
+        st.markdown("---")
+
+        # Generate All Chapters button
+        st.subheader("📚 Generate All Chapters")
+
+        # Show progress information
+        completed_chapters = set(st.session_state.generated_chapters.keys()) if st.session_state.generated_chapters else set()
+        remaining_chapters = set(range(1, 18)) - completed_chapters
+
+        if completed_chapters:
+            st.write(f"**Completed:** {len(completed_chapters)}/17 chapters")
+            st.write(f"**Completed chapters:** {', '.join(map(str, sorted(completed_chapters)))}")
+
+        if remaining_chapters:
+            st.write(f"**Remaining:** {len(remaining_chapters)} chapters")
+            st.write(f"**Remaining chapters:** {', '.join(map(str, sorted(remaining_chapters)))}")
+
+            # Options for generation
+            col_a, col_b = st.columns(2)
+
+            with col_a:
+                if st.button("📖 Generate All Remaining Chapters", type="primary", help="Generate all remaining chapters sequentially"):
+                    generate_all_chapters(remaining_chapters)
+
+            with col_b:
+                # Use session state to handle confirmation
+                if 'confirm_regenerate_all' not in st.session_state:
+                    st.session_state.confirm_regenerate_all = False
+
+                if not st.session_state.confirm_regenerate_all:
+                    if st.button("🔄 Regenerate All 17 Chapters", type="secondary", help="Regenerate all chapters from scratch"):
+                        if st.session_state.generated_chapters:
+                            st.session_state.confirm_regenerate_all = True
+                            st.rerun()
+                        else:
+                            generate_all_chapters(set(range(1, 18)))
+                else:
+                    st.warning("⚠️ This will overwrite all existing chapters!")
+                    col_confirm, col_cancel = st.columns(2)
+                    with col_confirm:
+                        if st.button("✅ Confirm Regenerate", type="secondary"):
+                            st.session_state.confirm_regenerate_all = False
+                            generate_all_chapters(set(range(1, 18)))
+                    with col_cancel:
+                        if st.button("❌ Cancel", type="secondary"):
+                            st.session_state.confirm_regenerate_all = False
+                            st.rerun()
+        else:
+            st.success("🎉 All 17 chapters have been generated!")
+
+            # Use session state to handle confirmation for regenerating all when complete
+            if 'confirm_regenerate_complete' not in st.session_state:
+                st.session_state.confirm_regenerate_complete = False
+
+            if not st.session_state.confirm_regenerate_complete:
+                if st.button("🔄 Regenerate All 17 Chapters", type="secondary", help="Regenerate all chapters from scratch"):
+                    st.session_state.confirm_regenerate_complete = True
+                    st.rerun()
+            else:
+                st.warning("⚠️ This will overwrite all existing chapters!")
+                col_confirm, col_cancel = st.columns(2)
+                with col_confirm:
+                    if st.button("✅ Confirm Regenerate All", type="secondary"):
+                        st.session_state.confirm_regenerate_complete = False
+                        generate_all_chapters(set(range(1, 18)))
+                with col_cancel:
+                    if st.button("❌ Cancel Regenerate", type="secondary"):
+                        st.session_state.confirm_regenerate_complete = False
+                        st.rerun()
     
     with col2:
         st.subheader("Generated Chapters")
 
         if st.session_state.generated_chapters:
             # Show list of completed chapters
-            completed_chapters = sorted(st.session_state.generated_chapters.keys())
+            completed_chapters = sorted(map(int, st.session_state.generated_chapters.keys()))
             st.write(f"**Completed Chapters:** {', '.join(map(str, completed_chapters))}")
 
             # Chapter viewer and editor

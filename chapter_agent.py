@@ -82,41 +82,156 @@ class ChapterAgent:
                      setting_description: str, chapter_number: int,
                      previous_chapter: Optional[str] = None, verbose: bool = True) -> str:
         """
-        Write a complete chapter based on the provided outline and story elements.
-        
+        Write a complete chapter using a two-step process: first generate a detailed prompt,
+        then use that prompt to write a comprehensive chapter.
+
         Args:
-            chapter_outline: Detailed outline for this specific chapter
+            chapter_outline: The complete book outline (all 17 chapters)
             characters: Dictionary of character roles and their descriptions
             setting_description: Description of the novel's setting/world
             chapter_number: The chapter number being written
             previous_chapter: The text of the previous chapter (if exists)
             verbose: Whether to print progress messages
-            
+
         Returns:
             A complete chapter with proper structure and pacing
         """
         
-        prompt = self._create_prompt(
-            chapter_outline, characters, setting_description, 
-            chapter_number, previous_chapter
-        )
-        
         if verbose:
             print(f"ChapterAgent> Writing Chapter {chapter_number}...")
-            print("ChapterAgent> Processing outline and character details...")
-        
+            print("ChapterAgent> Step 1: Generating detailed writing prompt...")
+
+        # Step 1: Generate a detailed prompt for writing the chapter
+        detailed_prompt = self._generate_chapter_prompt(
+            chapter_outline, characters, setting_description,
+            chapter_number, previous_chapter, verbose
+        )
+
+        if verbose:
+            print("ChapterAgent> Step 2: Writing chapter using generated prompt...")
+
+        # Step 2: Use the detailed prompt to write the actual chapter
+        chapter_content = self._write_chapter_from_prompt(
+            detailed_prompt, chapter_number, verbose
+        )
+
+        return chapter_content
+
+    def _generate_chapter_prompt(self, chapter_outline: str, characters: Dict[str, str],
+                                setting_description: str, chapter_number: int,
+                                previous_chapter: Optional[str] = None, verbose: bool = True) -> str:
+        """
+        Generate a detailed prompt for writing a specific chapter.
+
+        Args:
+            chapter_outline: The complete book outline (all 17 chapters)
+            characters: Dictionary of character roles and their descriptions
+            setting_description: Description of the novel's setting/world
+            chapter_number: The chapter number being written
+            previous_chapter: The text of the previous chapter (if exists)
+            verbose: Whether to print progress messages
+
+        Returns:
+            A detailed prompt for writing the chapter
+        """
+        # Format character information
+        character_info = "\n".join([
+            f"{role.upper()}:\n{description}\n"
+            for role, description in characters.items()
+        ])
+
+        # Handle previous chapter context
+        previous_context = ""
+        if previous_chapter:
+            previous_context = f"""
+PREVIOUS CHAPTER SUMMARY:
+{previous_chapter[-1000:]}
+
+The new chapter should continue seamlessly from this point.
+"""
+
+        prompt_generation_request = f"""You are a professional writing coach specializing in young adult fiction. Your task is to create a detailed, comprehensive prompt that will guide an AI to write an engaging Chapter {chapter_number} of a YA novel.
+
+COMPLETE BOOK OUTLINE:
+{chapter_outline}
+
+SETTING DESCRIPTION:
+{setting_description}
+
+CHARACTER PROFILES:
+{character_info}
+{previous_context}
+
+Based on the above information, create a detailed writing prompt that will result in a rich, engaging Chapter {chapter_number} that is 3,000-4,500 words long. The prompt should include:
+
+1. SPECIFIC SCENE DETAILS: What exactly happens in this chapter, scene by scene
+2. CHARACTER DEVELOPMENT: How characters should grow or change
+3. DIALOGUE GUIDANCE: Key conversations that need to happen
+4. SENSORY DETAILS: Specific atmospheric and sensory elements to include
+5. PACING INSTRUCTIONS: How to structure the rising and falling action
+6. EMOTIONAL BEATS: What emotions should be evoked and when
+7. PLOT ADVANCEMENT: How this chapter moves the overall story forward
+8. CHAPTER ENDING: Specific guidance on how to end with impact
+
+Create a comprehensive prompt that will result in a substantial, well-developed chapter that feels authentic to the YA genre and advances both character and plot development significantly."""
+
         response = self.client.chat.completions.create(
             model=self.model,
             messages=[
-                {"role": "system", "content": self.system_instructions},
-                {"role": "user", "content": prompt}
+                {"role": "system", "content": "You are an expert writing coach who creates detailed prompts for writing compelling young adult fiction chapters."},
+                {"role": "user", "content": prompt_generation_request}
             ],
-            temperature=0.7,
-            max_tokens=4000  # Chapters need more tokens
+            temperature=0.6,
+            max_tokens=2000
         )
 
         return response.choices[0].message.content.strip()
-    
+
+    def _write_chapter_from_prompt(self, detailed_prompt: str, chapter_number: int,
+                                  verbose: bool = True) -> str:
+        """
+        Write a chapter using a detailed prompt.
+
+        Args:
+            detailed_prompt: The detailed prompt for writing the chapter
+            chapter_number: The chapter number being written
+            verbose: Whether to print progress messages
+
+        Returns:
+            The complete chapter content
+        """
+        chapter_writing_instructions = """You are a professional young adult fiction writer. Your task is to write a complete, engaging chapter based on the detailed prompt provided.
+
+WRITING REQUIREMENTS:
+- Write 3,000-4,500 words
+- Use third person limited POV
+- Create authentic teenage voices and concerns
+- Include rich sensory details and atmospheric descriptions
+- Balance action, dialogue, and internal thoughts
+- Show character growth and development
+- Maintain appropriate pacing for YA readers
+- End with emotional impact or compelling hook
+
+CHAPTER STRUCTURE:
+1. SENSORY OPENING (2-3 paragraphs): Begin with vivid sensory details that immediately establish mood and atmosphere
+2. RISING ACTION (majority of chapter): Build tension progressively with character development and plot advancement
+3. CLIMAX/TURNING POINT: A significant moment of conflict, revelation, or change
+4. FALLING ACTION & RESOLUTION: Resolve immediate chapter tension while setting up future intrigue
+
+Focus on creating a chapter that feels substantial, emotionally resonant, and advances both character and plot in meaningful ways."""
+
+        response = self.client.chat.completions.create(
+            model=self.model,
+            messages=[
+                {"role": "system", "content": chapter_writing_instructions},
+                {"role": "user", "content": detailed_prompt}
+            ],
+            temperature=0.7,
+            max_tokens=6000  # Increased for longer chapters
+        )
+
+        return response.choices[0].message.content.strip()
+
     def _create_prompt(self, chapter_outline: str, characters: Dict[str, str],
                       setting_description: str, chapter_number: int,
                       previous_chapter: Optional[str] = None) -> str:
@@ -174,70 +289,99 @@ Please write the complete chapter now."""
                                        pov_character: str, previous_chapter: Optional[str] = None,
                                        verbose: bool = True) -> str:
         """
-        Write a chapter from a specific character's point of view.
-        
+        Write a chapter from a specific character's point of view using the two-step process.
+
         Args:
-            chapter_outline: Detailed outline for this specific chapter
+            chapter_outline: The complete book outline (all 17 chapters)
             characters: Dictionary of character roles and their descriptions
             setting_description: Description of the novel's setting/world
             chapter_number: The chapter number being written
             pov_character: The character whose POV to write from
             previous_chapter: The text of the previous chapter (if exists)
             verbose: Whether to print progress messages
-            
+
         Returns:
             A complete chapter written from the specified character's POV
         """
         if pov_character not in characters:
             raise ValueError(f"POV character '{pov_character}' not found in character descriptions")
-        
-        # Create modified prompt with POV specification
+
+        if verbose:
+            print(f"ChapterAgent> Writing Chapter {chapter_number} from {pov_character}'s POV...")
+            print("ChapterAgent> Step 1: Generating POV-specific writing prompt...")
+
+        # Step 1: Generate a detailed POV-specific prompt
+        detailed_prompt = self._generate_pov_chapter_prompt(
+            chapter_outline, characters, setting_description,
+            chapter_number, pov_character, previous_chapter
+        )
+
+        if verbose:
+            print("ChapterAgent> Step 2: Writing chapter from POV using generated prompt...")
+
+        # Step 2: Write the chapter using the POV-specific prompt
+        chapter_content = self._write_chapter_from_prompt(
+            detailed_prompt, chapter_number, verbose
+        )
+
+        return chapter_content
+
+    def _generate_pov_chapter_prompt(self, chapter_outline: str, characters: Dict[str, str],
+                                    setting_description: str, chapter_number: int,
+                                    pov_character: str, previous_chapter: Optional[str] = None) -> str:
+        """Generate a detailed prompt for writing a POV-specific chapter."""
+
+        # Format character information
         character_info = "\n".join([
-            f"{role.upper()}:\n{description[:400]}...\n" 
+            f"{role.upper()}:\n{description}\n"
             for role, description in characters.items()
         ])
-        
+
+        # Handle previous chapter context
         previous_context = ""
         if previous_chapter:
             previous_context = f"""
-PREVIOUS CHAPTER ENDING:
-{previous_chapter[-500:]}
+PREVIOUS CHAPTER SUMMARY:
+{previous_chapter[-1000:]}
 
-Please ensure smooth continuity from the previous chapter.
+The new chapter should continue seamlessly from this point.
 """
-        
-        pov_prompt = f"""Write Chapter {chapter_number} of a young adult novel from {pov_character.upper()}'S POINT OF VIEW.
 
-CHAPTER OUTLINE:
+        pov_prompt_request = f"""You are a professional writing coach specializing in young adult fiction. Create a detailed, comprehensive prompt for writing Chapter {chapter_number} from {pov_character.upper()}'S POINT OF VIEW.
+
+COMPLETE BOOK OUTLINE:
 {chapter_outline}
 
 SETTING DESCRIPTION:
 {setting_description}
 
-CHARACTERS:
+CHARACTER PROFILES:
 {character_info}
 
-POV CHARACTER FOCUS:
-Write this chapter entirely from {pov_character}'s perspective. Show their thoughts, feelings, and observations. 
-Filter all events through their unique viewpoint and personality.
+POV CHARACTER: {pov_character.upper()}
 {previous_context}
 
-Follow the same structure and writing guidelines as specified in the instructions, but ensure everything 
-is experienced through {pov_character}'s eyes and consciousness.
+Create a detailed writing prompt that will result in a rich, engaging Chapter {chapter_number} (3,000-4,500 words) written entirely from {pov_character}'s perspective. The prompt should include:
 
-Please write the complete chapter now."""
-        
-        if verbose:
-            print(f"ChapterAgent> Writing Chapter {chapter_number} from {pov_character}'s POV...")
-        
+1. POV-SPECIFIC SCENE DETAILS: What {pov_character} experiences, sees, thinks, and feels
+2. INTERNAL MONOLOGUE GUIDANCE: {pov_character}'s thoughts, reactions, and emotional journey
+3. DIALOGUE FROM POV: How {pov_character} speaks and interprets others' words
+4. SENSORY EXPERIENCE: What {pov_character} specifically notices through their senses
+5. CHARACTER VOICE: How to capture {pov_character}'s unique personality and speech patterns
+6. EMOTIONAL BEATS: {pov_character}'s emotional arc throughout the chapter
+7. RELATIONSHIP DYNAMICS: How {pov_character} views and interacts with other characters
+8. PLOT ADVANCEMENT: How events unfold from {pov_character}'s limited perspective
+
+Ensure the prompt will create a chapter that feels authentic to {pov_character}'s voice while advancing the overall story."""
+
         response = self.client.chat.completions.create(
             model=self.model,
             messages=[
-                {"role": "system", "content": self.system_instructions},
-                {"role": "user", "content": pov_prompt}
+                {"role": "system", "content": "You are an expert writing coach who creates detailed prompts for POV-specific young adult fiction chapters."},
+                {"role": "user", "content": pov_prompt_request}
             ],
-            temperature=0.7,
-            max_tokens=4000  # Chapters need more tokens
+            temperature=0.6,
+            max_tokens=2000
         )
 
         return response.choices[0].message.content.strip()

@@ -73,39 +73,170 @@ class CharacterAgent:
     
     def generate_character(self, novel_concept: str, setting_description: str,
                           character_role: str, character_description: Optional[str] = None,
+                          existing_characters: Optional[Dict[str, str]] = None,
                           verbose: bool = True) -> str:
         """
-        Generate a comprehensive character description for a YA novel.
+        Generate a comprehensive character description for a YA novel using a two-step process:
+        first generate a detailed prompt, then use that prompt to create the character.
 
         Args:
             novel_concept: The overall concept/theme of the novel
             setting_description: Description of the novel's setting/world
             character_role: The character's role (protagonist, antagonist, ally, etc.)
             character_description: Optional initial character description to build upon
+            existing_characters: Optional dictionary of existing character descriptions for context
             verbose: Whether to print progress messages
 
         Returns:
             A detailed character description with all requested elements
         """
-        prompt = self._create_prompt(novel_concept, setting_description, character_role, character_description)
-        
+
         if verbose:
-            print("CharacterAgent> Creating character for role:", character_role)
-            print("CharacterAgent> Novel concept:", novel_concept[:50] + "...")
-            print("CharacterAgent> Setting:", setting_description[:50] + "...")
-        
+            print(f"CharacterAgent> Creating character for role: {character_role}")
+            print("CharacterAgent> Step 1: Generating detailed character prompt...")
+
+        # Step 1: Generate a detailed prompt for character creation
+        detailed_prompt = self._generate_character_prompt(
+            novel_concept, setting_description, character_role,
+            character_description, existing_characters, verbose
+        )
+
+        if verbose:
+            print("CharacterAgent> Step 2: Creating character using generated prompt...")
+
+        # Step 2: Use the detailed prompt to create the actual character
+        character_content = self._create_character_from_prompt(
+            detailed_prompt, character_role, verbose
+        )
+
+        return character_content
+
+    def _generate_character_prompt(self, novel_concept: str, setting_description: str,
+                                  character_role: str, character_description: Optional[str] = None,
+                                  existing_characters: Optional[Dict[str, str]] = None,
+                                  verbose: bool = True) -> str:
+        """
+        Generate a detailed prompt for creating a specific character.
+
+        Args:
+            novel_concept: The overall concept/theme of the novel
+            setting_description: Description of the novel's setting/world
+            character_role: The character's role (protagonist, antagonist, ally, etc.)
+            character_description: Optional initial character description to build upon
+            existing_characters: Optional dictionary of existing character descriptions for context
+            verbose: Whether to print progress messages
+
+        Returns:
+            A detailed prompt for creating the character
+        """
+        # Format existing character information if provided
+        existing_character_info = ""
+        if existing_characters:
+            existing_character_info = "\n".join([
+                f"{role.upper()}:\n{description}\n"
+                for role, description in existing_characters.items()
+            ])
+            existing_character_info = f"""
+EXISTING CHARACTERS ALREADY CREATED:
+{existing_character_info}
+
+The new character should complement and interact well with these existing characters while being distinct and unique.
+"""
+
+        # Handle initial character description
+        initial_description_context = ""
+        if character_description:
+            initial_description_context = f"""
+INITIAL CHARACTER DESCRIPTION PROVIDED:
+{character_description}
+
+Please use this as a foundation but expand significantly with rich details, ensuring consistency while adding depth and complexity.
+"""
+
+        prompt_generation_request = f"""You are a professional character development coach specializing in young adult fiction. Your task is to create a detailed, comprehensive prompt that will guide an AI to develop a compelling {character_role} character for a YA novel.
+
+NOVEL CONCEPT:
+{novel_concept}
+
+SETTING DESCRIPTION:
+{setting_description}
+
+CHARACTER ROLE: {character_role}
+{existing_character_info}{initial_description_context}
+
+Based on the above information, create a detailed character creation prompt that will result in a rich, three-dimensional {character_role} character. The prompt should include specific guidance for:
+
+1. PHYSICAL APPEARANCE: Detailed visual description that fits the setting and role
+2. PERSONALITY TRAITS: Complex personality with both strengths and flaws
+3. BACKGROUND & HISTORY: Personal history that shapes who they are
+4. GOALS & MOTIVATIONS: What drives them and what they want to achieve
+5. RELATIONSHIPS: How they relate to others and existing characters
+6. CHARACTER ARC POTENTIAL: How they can grow and change throughout the story
+7. DIALOGUE VOICE: How they speak and express themselves
+8. ROLE-SPECIFIC ELEMENTS: How they fulfill their narrative function
+9. YA APPEAL: What makes them relatable and engaging to teenage readers
+
+Create a comprehensive prompt that will result in a detailed character profile that feels authentic, serves the story, and resonates with YA readers."""
+
         response = self.client.chat.completions.create(
             model=self.model,
             messages=[
-                {"role": "system", "content": self.system_instructions},
-                {"role": "user", "content": prompt}
+                {"role": "system", "content": "You are an expert character development coach who creates detailed prompts for developing compelling young adult fiction characters."},
+                {"role": "user", "content": prompt_generation_request}
+            ],
+            temperature=0.6,
+            max_tokens=2000
+        )
+
+        return response.choices[0].message.content.strip()
+
+    def _create_character_from_prompt(self, detailed_prompt: str, character_role: str,
+                                     verbose: bool = True) -> str:
+        """
+        Create a character using a detailed prompt.
+
+        Args:
+            detailed_prompt: The detailed prompt for creating the character
+            character_role: The character's role (for reference)
+            verbose: Whether to print progress messages
+
+        Returns:
+            The complete character description
+        """
+        character_creation_instructions = """You are a professional character developer specializing in young adult fiction. Your task is to create a comprehensive, engaging character based on the detailed prompt provided.
+
+CHARACTER PROFILE REQUIREMENTS:
+- Create a three-dimensional character that feels authentic and relatable to YA readers
+- Include detailed physical appearance, personality, background, and motivations
+- Balance strengths and flaws to avoid Mary Sue/Gary Stu characters
+- Ensure the character fits naturally into the provided setting
+- Make them serve their narrative role while being a complex individual
+- Include specific details that make them memorable and unique
+
+CHARACTER PROFILE STRUCTURE:
+1. PHYSICAL APPEARANCE: Detailed visual description including age, build, distinctive features, style
+2. PERSONALITY: Core traits, quirks, how they interact with others, emotional patterns
+3. BACKGROUND & HISTORY: Personal history, family, formative experiences
+4. GOALS & MOTIVATIONS: Primary and secondary goals, internal drives, fears
+5. STRENGTHS: Natural talents, learned skills, positive traits
+6. FLAWS & WEAKNESSES: Character flaws, bad habits, areas for growth
+7. RELATIONSHIPS: How they relate to others, social dynamics
+8. VOICE & MANNERISMS: How they speak, distinctive behaviors, expressions
+
+Focus on creating a character that YA readers will connect with emotionally while serving the story effectively."""
+
+        response = self.client.chat.completions.create(
+            model=self.model,
+            messages=[
+                {"role": "system", "content": character_creation_instructions},
+                {"role": "user", "content": detailed_prompt}
             ],
             temperature=0.7,
             max_tokens=3000
         )
 
         return response.choices[0].message.content.strip()
-    
+
     def _create_prompt(self, novel_concept: str, setting_description: str,
                       character_role: str, character_description: Optional[str] = None) -> str:
         """Create the prompt for the character creation task."""
@@ -151,6 +282,7 @@ If an initial character description was provided, use it as a foundation but exp
                                    verbose: bool = True) -> Dict[str, str]:
         """
         Generate multiple characters for different roles in the story.
+        Each character is created with awareness of previously created characters.
 
         Args:
             novel_concept: The overall concept/theme of the novel
@@ -171,9 +303,12 @@ If an initial character description was provided, use it as a foundation but exp
             # Get initial description if provided
             initial_desc = character_descriptions.get(role) if character_descriptions else None
 
+            # Pass existing characters as context for new character creation
             character_desc = self.generate_character(
                 novel_concept, setting_description, role,
-                character_description=initial_desc, verbose=False
+                character_description=initial_desc,
+                existing_characters=characters,  # Pass existing characters for context
+                verbose=False
             )
             characters[role] = character_desc
 
