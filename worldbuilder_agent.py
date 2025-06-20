@@ -1,8 +1,8 @@
-from openai import OpenAI
+from abstract_writer_agent import AbstractWriterAgent
 from typing import Optional
 
 
-class WorldbuilderAgent:
+class WorldbuilderAgent(AbstractWriterAgent):
     """
     A specialized agent for creating compelling young adult fiction setting descriptions.
     
@@ -10,21 +10,18 @@ class WorldbuilderAgent:
     atmospheric worldbuilding content tailored for YA audiences.
     """
     
-    def __init__(self, model: str = "gpt-4o-mini", api_key: str = None):
+    def __init__(self, model: str = "gpt-4o-mini", api_key: str = None,
+                 writing_style_guide: Optional[str] = None):
         """
         Initialize the WorldbuilderAgent.
 
         Args:
             model: The OpenAI model to use (default: gpt-4o-mini)
             api_key: OpenAI API key (if None, will use environment variable)
+            writing_style_guide: Optional text containing writing style guidelines.
+                                If None, uses the default worldbuilding style guide
         """
-        self.model = model
-        self.client = OpenAI(api_key=api_key)
-        self.system_instructions = self._get_instructions()
-
-    def _initialize_client(self):
-        """Initialize the OpenAI client - kept for compatibility."""
-        pass  # No longer needed with OpenAI client
+        super().__init__(model, api_key, writing_style_guide)
     
     def _get_instructions(self) -> str:
         """Get the specialized instructions for the worldbuilding agent."""
@@ -40,8 +37,37 @@ class WorldbuilderAgent:
         - Keeping descriptions concise but evocative (2-3 paragraphs max)
         - Incorporating elements that suggest conflict, mystery, or adventure
         
-        Avoid overly complex world-building details - focus on what makes the setting 
+        Avoid overly complex world-building details - focus on what makes the setting
         feel alive and compelling for the story."""
+
+    def _get_default_style_guide(self) -> str:
+        """Get the default writing style guide for worldbuilding."""
+        return """WORLDBUILDING STYLE GUIDE:
+AVOID RUN-ON SENTENCES
+
+TONE & ATMOSPHERE:
+- Create immersive, atmospheric descriptions that draw readers into the world
+- Use evocative language that appeals to YA readers (ages 13-18)
+- Balance concrete details with emotional resonance
+- Establish mood through sensory details and environmental elements
+
+DESCRIPTION STYLE:
+- Keep descriptions concise but vivid (1 paragraph maximum)
+- Focus on unique or intriguing elements that suggest adventure or conflict
+- Use active, engaging language rather than passive exposition
+- Incorporate elements that hint at the story's themes and potential conflicts
+
+WORLD ELEMENTS:
+- Highlight aspects that make the setting feel alive and dynamic
+- Include details that suggest history, culture, and social dynamics
+- Focus on elements that will impact character development and plot
+- Create a sense of place that readers want to explore further
+
+LANGUAGE GUIDELINES:
+- Use age-appropriate vocabulary that challenges without overwhelming
+- Employ metaphors and imagery that resonate with teenage experiences
+- Avoid overly technical or academic language
+- Create descriptions that feel fresh and contemporary while fitting the genre"""
     
     def generate_setting(self, setting_description: str, novel_concept: str,
                         verbose: bool = True) -> str:
@@ -61,22 +87,30 @@ class WorldbuilderAgent:
         if verbose:
             print("WorldbuilderAgent> Processing setting:", setting_description[:50] + "...")
             print("WorldbuilderAgent> Novel concept:", novel_concept[:50] + "...")
-            print("WorldbuilderAgent> Step 1: Generating detailed worldbuilding prompt...")
 
-        # Step 1: Generate a detailed prompt for worldbuilding
-        detailed_prompt = self._generate_worldbuilding_prompt(
-            setting_description, novel_concept, verbose
+        # Use the parent class's two-step generation method
+        return self._execute_two_step_generation(
+            step1_args=(setting_description, novel_concept),
+            step1_kwargs={'verbose': verbose},
+            step2_args=(setting_description, novel_concept),  # Pass original args for context
+            step2_kwargs={'verbose': verbose},
+            verbose=verbose,
+            agent_name="WorldbuilderAgent"
         )
 
-        if verbose:
-            print("WorldbuilderAgent> Step 2: Creating setting using generated prompt...")
+    def _generate_detailed_prompt(self, setting_description: str, novel_concept: str,
+                                 verbose: bool = True) -> str:
+        """
+        Implementation of abstract method for generating detailed prompts.
+        """
+        return self._generate_worldbuilding_prompt(setting_description, novel_concept, verbose)
 
-        # Step 2: Use the detailed prompt to create the actual setting
-        setting_content = self._create_setting_from_prompt(
-            detailed_prompt, verbose
-        )
-
-        return setting_content
+    def _create_content_from_prompt(self, detailed_prompt: str, setting_description: str = None,
+                                   novel_concept: str = None, verbose: bool = True) -> str:
+        """
+        Implementation of abstract method for creating content from prompts.
+        """
+        return self._create_setting_from_prompt(detailed_prompt, verbose)
 
     def _generate_worldbuilding_prompt(self, setting_description: str, novel_concept: str,
                                       verbose: bool = True) -> str:
@@ -112,17 +146,12 @@ Based on the above information, create a detailed worldbuilding prompt that will
 
 Create a comprehensive prompt that will result in a setting description that feels vivid, engaging, and perfectly suited for young adult fiction while supporting the story's themes and conflicts."""
 
-        response = self.client.chat.completions.create(
-            model=self.model,
-            messages=[
-                {"role": "system", "content": "You are an expert worldbuilding consultant who creates detailed prompts for developing compelling young adult fiction settings."},
-                {"role": "user", "content": prompt_generation_request}
-            ],
+        return self._make_api_call(
+            system_content="You are an expert worldbuilding consultant who creates detailed prompts for developing compelling young adult fiction settings.",
+            user_content=prompt_generation_request,
             temperature=0.6,
             max_tokens=2000
         )
-
-        return response.choices[0].message.content.strip()
 
     def _create_setting_from_prompt(self, detailed_prompt: str, verbose: bool = True) -> str:
         """
@@ -155,17 +184,12 @@ WRITING STYLE:
 
 Focus on creating a setting description that immediately draws readers in and makes them want to know more about this world and the stories that unfold within it."""
 
-        response = self.client.chat.completions.create(
-            model=self.model,
-            messages=[
-                {"role": "system", "content": setting_creation_instructions},
-                {"role": "user", "content": detailed_prompt}
-            ],
+        return self._make_api_call(
+            system_content=setting_creation_instructions,
+            user_content=detailed_prompt,
             temperature=0.7,
             max_tokens=2000
         )
-
-        return response.choices[0].message.content.strip()
 
     def _create_prompt(self, setting_description: str, novel_concept: str) -> str:
         """Create the prompt for the worldbuilding task."""

@@ -1,8 +1,8 @@
-from openai import OpenAI
-from typing import Optional, Dict, Any
+from abstract_writer_agent import AbstractWriterAgent
+from typing import Optional, Dict
 
 
-class CharacterAgent:
+class CharacterAgent(AbstractWriterAgent):
     """
     A specialized agent for creating compelling young adult fiction character descriptions.
     
@@ -10,21 +10,18 @@ class CharacterAgent:
     detailed character profiles including physical appearance, personality, goals, and flaws.
     """
     
-    def __init__(self, model: str = "gpt-4o-mini", api_key: str = None):
+    def __init__(self, model: str = "gpt-4o-mini", api_key: str = None,
+                 writing_style_guide: Optional[str] = None):
         """
         Initialize the CharacterAgent.
 
         Args:
             model: The OpenAI model to use (default: gpt-4o-mini)
             api_key: OpenAI API key (if None, will use environment variable)
+            writing_style_guide: Optional text containing writing style guidelines.
+                                If None, uses the default character development style guide
         """
-        self.model = model
-        self.client = OpenAI(api_key=api_key)
-        self.system_instructions = self._get_instructions()
-
-    def _initialize_client(self):
-        """Initialize the OpenAI client - kept for compatibility."""
-        pass  # No longer needed with OpenAI client
+        super().__init__(model, api_key, writing_style_guide)
     
     def _get_instructions(self) -> str:
         """Get the specialized instructions for the character creation agent."""
@@ -70,6 +67,40 @@ class CharacterAgent:
         - Serve their narrative function while being complex individuals
         - Have potential for growth and change throughout the story
         - Balance strengths and flaws to avoid Mary Sue/Gary Stu characters"""
+
+    def _get_default_style_guide(self) -> str:
+        """Get the default writing style guide for character development."""
+        return """CHARACTER DEVELOPMENT STYLE GUIDE:
+AVOID RUN-ON SENTENCES
+CHARACTER AUTHENTICITY:
+- Create three-dimensional characters that feel real and relatable to YA readers
+- Balance strengths and flaws to avoid Mary Sue/Gary Stu archetypes
+- Ensure characters have clear motivations, goals, and internal conflicts
+- Make characters age-appropriate while AVOIDING STEREOTYPES
+
+DESCRIPTION STYLE:
+- Use vivid, specific details for physical appearance that reflect personality
+- Focus on distinctive features that make characters memorable
+- Describe clothing and style choices that reveal character traits
+- Include mannerisms and habits that bring characters to life
+
+PERSONALITY DEVELOPMENT:
+- Create complex personalities with both positive and negative traits
+- Show how background and experiences shape character behavior
+- Include realistic teenage concerns, interests, and speech patterns
+- Develop unique voices and dialogue styles for each character
+
+RELATIONSHIP DYNAMICS:
+- Show how characters interact with others in authentic ways
+- Create believable conflicts and connections between characters
+- Demonstrate character growth through relationships and challenges
+- Balance individual character development with ensemble dynamics
+
+NARRATIVE FUNCTION:
+- Ensure each character serves a clear purpose in the story
+- Create character arcs that support the overall narrative themes
+- Balance character agency with plot requirements
+- Make characters active participants rather than passive observers"""
     
     def generate_character(self, novel_concept: str, setting_description: str,
                           character_role: str, character_description: Optional[str] = None,
@@ -93,23 +124,39 @@ class CharacterAgent:
 
         if verbose:
             print(f"CharacterAgent> Creating character for role: {character_role}")
-            print("CharacterAgent> Step 1: Generating detailed character prompt...")
 
-        # Step 1: Generate a detailed prompt for character creation
-        detailed_prompt = self._generate_character_prompt(
+        # Use the parent class's two-step generation method
+        return self._execute_two_step_generation(
+            step1_args=(novel_concept, setting_description, character_role),
+            step1_kwargs={
+                'character_description': character_description,
+                'existing_characters': existing_characters,
+                'verbose': verbose
+            },
+            step2_args=(),
+            step2_kwargs={'character_role': character_role, 'verbose': verbose},
+            verbose=verbose,
+            agent_name="CharacterAgent"
+        )
+
+    def _generate_detailed_prompt(self, novel_concept: str, setting_description: str,
+                                 character_role: str, character_description: Optional[str] = None,
+                                 existing_characters: Optional[Dict[str, str]] = None,
+                                 verbose: bool = True) -> str:
+        """
+        Implementation of abstract method for generating detailed prompts.
+        """
+        return self._generate_character_prompt(
             novel_concept, setting_description, character_role,
             character_description, existing_characters, verbose
         )
 
-        if verbose:
-            print("CharacterAgent> Step 2: Creating character using generated prompt...")
-
-        # Step 2: Use the detailed prompt to create the actual character
-        character_content = self._create_character_from_prompt(
-            detailed_prompt, character_role, verbose
-        )
-
-        return character_content
+    def _create_content_from_prompt(self, detailed_prompt: str, character_role: str = None,
+                                   verbose: bool = True) -> str:
+        """
+        Implementation of abstract method for creating content from prompts.
+        """
+        return self._create_character_from_prompt(detailed_prompt, character_role, verbose)
 
     def _generate_character_prompt(self, novel_concept: str, setting_description: str,
                                   character_role: str, character_description: Optional[str] = None,
@@ -178,17 +225,12 @@ Based on the above information, create a detailed character creation prompt that
 
 Create a comprehensive prompt that will result in a detailed character profile that feels authentic, serves the story, and resonates with YA readers."""
 
-        response = self.client.chat.completions.create(
-            model=self.model,
-            messages=[
-                {"role": "system", "content": "You are an expert character development coach who creates detailed prompts for developing compelling young adult fiction characters."},
-                {"role": "user", "content": prompt_generation_request}
-            ],
+        return self._make_api_call(
+            system_content="You are an expert character development coach who creates detailed prompts for developing compelling young adult fiction characters.",
+            user_content=prompt_generation_request,
             temperature=0.6,
             max_tokens=2000
         )
-
-        return response.choices[0].message.content.strip()
 
     def _create_character_from_prompt(self, detailed_prompt: str, character_role: str,
                                      verbose: bool = True) -> str:
@@ -225,17 +267,12 @@ CHARACTER PROFILE STRUCTURE:
 
 Focus on creating a character that YA readers will connect with emotionally while serving the story effectively."""
 
-        response = self.client.chat.completions.create(
-            model=self.model,
-            messages=[
-                {"role": "system", "content": character_creation_instructions},
-                {"role": "user", "content": detailed_prompt}
-            ],
+        return self._make_api_call(
+            system_content=character_creation_instructions,
+            user_content=detailed_prompt,
             temperature=0.7,
             max_tokens=3000
         )
-
-        return response.choices[0].message.content.strip()
 
     def _create_prompt(self, novel_concept: str, setting_description: str,
                       character_role: str, character_description: Optional[str] = None) -> str:

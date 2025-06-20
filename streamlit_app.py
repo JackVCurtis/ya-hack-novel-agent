@@ -28,9 +28,34 @@ def init_database():
             generated_setting TEXT,
             generated_characters TEXT,
             generated_outline TEXT,
-            generated_chapters TEXT
+            generated_chapters TEXT,
+            worldbuilder_style_guide TEXT,
+            character_style_guide TEXT,
+            outliner_style_guide TEXT,
+            chapter_style_guide TEXT
         )
     ''')
+
+    # Add new columns to existing tables if they don't exist
+    try:
+        cursor.execute('ALTER TABLE stories ADD COLUMN worldbuilder_style_guide TEXT')
+    except sqlite3.OperationalError:
+        pass  # Column already exists
+
+    try:
+        cursor.execute('ALTER TABLE stories ADD COLUMN character_style_guide TEXT')
+    except sqlite3.OperationalError:
+        pass  # Column already exists
+
+    try:
+        cursor.execute('ALTER TABLE stories ADD COLUMN outliner_style_guide TEXT')
+    except sqlite3.OperationalError:
+        pass  # Column already exists
+
+    try:
+        cursor.execute('ALTER TABLE stories ADD COLUMN chapter_style_guide TEXT')
+    except sqlite3.OperationalError:
+        pass  # Column already exists
 
     conn.commit()
     conn.close()
@@ -48,8 +73,9 @@ def save_story_to_db(story_id, data):
     cursor.execute('''
         INSERT OR REPLACE INTO stories
         (id, title, updated_at, story_concept, initial_setting, protagonist_desc,
-         antagonist_desc, generated_setting, generated_characters, generated_outline, generated_chapters)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         antagonist_desc, generated_setting, generated_characters, generated_outline, generated_chapters,
+         worldbuilder_style_guide, character_style_guide, outliner_style_guide, chapter_style_guide)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ''', (
         story_id,
         data.get('title', 'Untitled Story'),
@@ -61,7 +87,11 @@ def save_story_to_db(story_id, data):
         data.get('generated_setting'),
         characters_json,
         data.get('generated_outline'),
-        chapters_json
+        chapters_json,
+        data.get('worldbuilder_style_guide'),
+        data.get('character_style_guide'),
+        data.get('outliner_style_guide'),
+        data.get('chapter_style_guide')
     ))
 
     conn.commit()
@@ -78,11 +108,17 @@ def load_story_from_db(story_id):
     conn.close()
 
     if row:
-        # Convert row to dictionary
+        # Convert row to dictionary - handle both old and new schema
         columns = ['id', 'title', 'created_at', 'updated_at', 'story_concept',
                   'initial_setting', 'protagonist_desc', 'antagonist_desc',
                   'generated_setting', 'generated_characters', 'generated_outline', 'generated_chapters']
-        data = dict(zip(columns, row))
+
+        # Add style guide columns if they exist in the row
+        if len(row) > 12:
+            columns.extend(['worldbuilder_style_guide', 'character_style_guide',
+                           'outliner_style_guide', 'chapter_style_guide'])
+
+        data = dict(zip(columns, row[:len(columns)]))
 
         # Parse JSON fields back to objects
         if data['generated_characters']:
@@ -138,6 +174,16 @@ def initialize_session_state():
     if 'antagonist_desc' not in st.session_state:
         st.session_state.antagonist_desc = None
 
+    # Initialize writing style guides
+    if 'worldbuilder_style_guide' not in st.session_state:
+        st.session_state.worldbuilder_style_guide = None
+    if 'character_style_guide' not in st.session_state:
+        st.session_state.character_style_guide = None
+    if 'outliner_style_guide' not in st.session_state:
+        st.session_state.outliner_style_guide = None
+    if 'chapter_style_guide' not in st.session_state:
+        st.session_state.chapter_style_guide = None
+
 
 def save_current_story():
     """Save current session state to database"""
@@ -150,7 +196,11 @@ def save_current_story():
         'generated_setting': st.session_state.get('generated_setting'),
         'generated_characters': st.session_state.get('generated_characters'),
         'generated_outline': st.session_state.get('generated_outline'),
-        'generated_chapters': st.session_state.get('generated_chapters')
+        'generated_chapters': st.session_state.get('generated_chapters'),
+        'worldbuilder_style_guide': st.session_state.get('worldbuilder_style_guide'),
+        'character_style_guide': st.session_state.get('character_style_guide'),
+        'outliner_style_guide': st.session_state.get('outliner_style_guide'),
+        'chapter_style_guide': st.session_state.get('chapter_style_guide')
     }
     save_story_to_db(st.session_state.current_story_id, data)
 
@@ -169,6 +219,18 @@ def load_story_into_session(story_id):
         st.session_state.generated_characters = data['generated_characters']
         st.session_state.generated_outline = data['generated_outline']
         st.session_state.generated_chapters = data['generated_chapters'] or {}
+
+        # Load style guides if they exist
+        st.session_state.worldbuilder_style_guide = data.get('worldbuilder_style_guide')
+        st.session_state.character_style_guide = data.get('character_style_guide')
+        st.session_state.outliner_style_guide = data.get('outliner_style_guide')
+        st.session_state.chapter_style_guide = data.get('chapter_style_guide')
+
+
+
+
+
+
 
 
 def main():
@@ -210,7 +272,8 @@ def main():
             st.session_state.story_title = "Untitled Story"
             # Clear all story data
             for key in ['story_concept', 'initial_setting', 'protagonist_desc', 'antagonist_desc',
-                       'generated_setting', 'generated_characters', 'generated_outline']:
+                       'generated_setting', 'generated_characters', 'generated_outline',
+                       'worldbuilder_style_guide', 'character_style_guide', 'outliner_style_guide', 'chapter_style_guide']:
                 st.session_state[key] = None
             st.session_state.generated_chapters = {}
             st.rerun()
@@ -236,6 +299,8 @@ def main():
             st.rerun()
     else:
         st.sidebar.info("No saved stories found.")
+
+
 
     # Auto-save functionality
     st.sidebar.write("---")
@@ -307,6 +372,13 @@ def main():
     if 'current_step' not in st.session_state:
         st.session_state.current_step = "Story Concept"
 
+    # Initialize completion tracking
+    if 'completion_states' not in st.session_state:
+        st.session_state.completion_states = {}
+
+    # Track completion state changes
+    track_completion_changes()
+
     # Render navigation header and route to appropriate page
     render_navigation_header()
 
@@ -324,6 +396,31 @@ def main():
         chapter_writing_page()
     elif current_step == "Edit Content":
         edit_content_page()
+
+
+def track_completion_changes():
+    """Track when steps are completed and trigger navigation updates"""
+
+    # Define current completion states
+    current_states = {
+        "Story Concept": bool(st.session_state.get('story_concept')),
+        "World Building": bool(st.session_state.get('generated_setting')),
+        "Character Creation": bool(st.session_state.get('generated_characters')),
+        "Story Outline": bool(st.session_state.get('generated_outline')),
+        "Chapter Writing": bool(st.session_state.get('generated_chapters'))
+    }
+
+    # Check for newly completed steps
+    for step_name, is_completed in current_states.items():
+        previous_state = st.session_state.completion_states.get(step_name, False)
+
+        # If step was just completed (changed from False to True)
+        if is_completed and not previous_state:
+            # Mark as just completed for potential auto-advance
+            st.session_state.step_just_completed = step_name
+
+    # Update stored completion states
+    st.session_state.completion_states = current_states
 
 
 def render_navigation_header():
@@ -374,6 +471,58 @@ def render_navigation_header():
             "completed": False  # Never marked as "completed"
         }
     ]
+
+    # Check if current step was just completed and auto-advance
+    current_step_index = next((i for i, step in enumerate(steps) if step["name"] == st.session_state.current_step), 0)
+    current_step = steps[current_step_index]
+
+    # Auto-advance logic: if a step was just completed and it's the current step, move to next available step
+    just_completed_step = st.session_state.get('step_just_completed')
+    if (just_completed_step == current_step["name"] and
+        current_step["completed"] and
+        current_step_index < len(steps) - 1):
+        # Find the next available step
+        for i in range(current_step_index + 1, len(steps)):
+            next_step = steps[i]
+
+            # Check if next step is available
+            if next_step["required"]:
+                is_available = bool(st.session_state.get(next_step["required"]))
+            else:
+                # Story Concept is always available, Edit Content available if any content exists
+                if next_step["name"] == "Story Concept":
+                    is_available = True
+                elif next_step["name"] == "Edit Content":
+                    is_available = any([
+                        st.session_state.get('story_concept'),
+                        st.session_state.get('generated_setting'),
+                        st.session_state.get('generated_characters'),
+                        st.session_state.get('generated_outline'),
+                        st.session_state.get('generated_chapters')
+                    ])
+                else:
+                    is_available = True
+
+            # If next step is available, auto-advance to it
+            if is_available:
+                # Store the previous step for notification
+                st.session_state.previous_completed_step = current_step["name"]
+                st.session_state.current_step = next_step["name"]
+                # Clear the completion flag
+                if 'step_just_completed' in st.session_state:
+                    del st.session_state.step_just_completed
+                st.rerun()
+                break
+
+        # Clear the completion flag even if we don't auto-advance
+        if 'step_just_completed' in st.session_state:
+            del st.session_state.step_just_completed
+
+    # Show completion notification if we just auto-advanced
+    if st.session_state.get('previous_completed_step'):
+        st.success(f"✅ {st.session_state.previous_completed_step} completed! Automatically moved to {st.session_state.current_step}.")
+        # Clear the notification flag
+        del st.session_state.previous_completed_step
 
     # Create navigation header
     st.markdown("### 📋 Story Development Steps")
@@ -469,6 +618,8 @@ def story_concept_page():
     """Page for entering basic story concept and setting"""
     st.header("📝 Story Concept & Setting")
     st.markdown("Start by defining your story's core concept and initial setting description.")
+
+
     
     with st.form("story_concept_form"):
         st.subheader("Story Concept")
@@ -538,22 +689,59 @@ def world_building_page():
     """Page for generating detailed world building"""
     st.header("🌍 World Building")
     st.markdown("Generate a detailed setting description based on your story concept.")
-    
+
     if not hasattr(st.session_state, 'story_concept'):
         st.warning("⚠️ Please complete the 'Story Concept' step first.")
         return
-    
+
+    # Worldbuilder Style Guide Section
+    with st.expander("✍️ Worldbuilder Writing Style Guide", expanded=False):
+        st.markdown("Customize how the AI generates your world descriptions:")
+
+        # Get default style guide
+        from worldbuilder_agent import WorldbuilderAgent
+        wb_agent = WorldbuilderAgent()
+        default_wb_guide = wb_agent._get_default_style_guide()
+
+        current_wb_guide = st.session_state.get('worldbuilder_style_guide') or default_wb_guide
+        wb_guide = st.text_area(
+            "Worldbuilding Style Guidelines:",
+            value=current_wb_guide,
+            height=150,
+            key="wb_style_input_main",
+            help="Guidelines for world and setting descriptions"
+        )
+
+        col1, col2 = st.columns(2)
+        with col1:
+            if st.button("💾 Save Style Guide", key="save_wb_style"):
+                st.session_state.worldbuilder_style_guide = wb_guide
+                save_current_story()
+                st.success("✅ Worldbuilder style guide saved!")
+
+        with col2:
+            if st.button("🔄 Reset to Default", key="reset_wb_main"):
+                st.session_state.worldbuilder_style_guide = None
+                save_current_story()
+                st.success("✅ Reset to default style guide!")
+                st.rerun()
+
     col1, col2 = st.columns([1, 2])
-    
+
     with col1:
         st.subheader("Your Story Elements")
         st.write("**Concept:**", st.session_state.story_concept[:100] + "...")
         st.write("**Initial Setting:**", st.session_state.initial_setting[:100] + "...")
-        
+
         if st.button("🎯 Generate Detailed Setting", type="primary"):
             with st.spinner("Creating your world..."):
                 try:
-                    worldbuilder = WorldbuilderAgent(model="gpt-4o-mini")
+                    # Use custom style guide if available
+                    custom_style = st.session_state.get('worldbuilder_style_guide')
+                    worldbuilder = WorldbuilderAgent(
+                        model="gpt-4o-mini",
+                        writing_style_guide=custom_style
+                    )
                     detailed_setting = worldbuilder.generate_setting(
                         st.session_state.initial_setting,
                         st.session_state.story_concept,
@@ -610,11 +798,43 @@ def character_creation_page():
     """Page for generating detailed character descriptions"""
     st.header("👥 Character Creation")
     st.markdown("Generate detailed character profiles based on your story elements.")
-    
+
     if not hasattr(st.session_state, 'story_concept') or not st.session_state.generated_setting:
         st.warning("⚠️ Please complete the 'Story Concept' and 'World Building' steps first.")
         return
-    
+
+    # Character Style Guide Section
+    with st.expander("✍️ Character Writing Style Guide", expanded=False):
+        st.markdown("Customize how the AI creates your character descriptions:")
+
+        # Get default style guide
+        from character_agent import CharacterAgent
+        char_agent = CharacterAgent()
+        default_char_guide = char_agent._get_default_style_guide()
+
+        current_char_guide = st.session_state.get('character_style_guide') or default_char_guide
+        char_guide = st.text_area(
+            "Character Development Style Guidelines:",
+            value=current_char_guide,
+            height=150,
+            key="char_style_input_main",
+            help="Guidelines for character development and descriptions"
+        )
+
+        col1, col2 = st.columns(2)
+        with col1:
+            if st.button("💾 Save Style Guide", key="save_char_style"):
+                st.session_state.character_style_guide = char_guide
+                save_current_story()
+                st.success("✅ Character style guide saved!")
+
+        with col2:
+            if st.button("🔄 Reset to Default", key="reset_char_main"):
+                st.session_state.character_style_guide = None
+                save_current_story()
+                st.success("✅ Reset to default style guide!")
+                st.rerun()
+
     col1, col2 = st.columns([1, 2])
     
     with col1:
@@ -636,7 +856,12 @@ def character_creation_page():
             if character_roles:
                 with st.spinner("Creating your characters..."):
                     try:
-                        character_agent = CharacterAgent(model="gpt-4o-mini")
+                        # Use custom style guide if available
+                        custom_style = st.session_state.get('character_style_guide')
+                        character_agent = CharacterAgent(
+                            model="gpt-4o-mini",
+                            writing_style_guide=custom_style
+                        )
 
                         # Prepare initial character descriptions from story concept page
                         initial_descriptions = {}
@@ -694,7 +919,12 @@ def character_creation_page():
             if st.button(f"🔄 Regenerate {role_to_regen.title()}"):
                 with st.spinner(f"Regenerating {role_to_regen}..."):
                     try:
-                        character_agent = CharacterAgent(model="gpt-4o-mini")
+                        # Use custom style guide if available
+                        custom_style = st.session_state.get('character_style_guide')
+                        character_agent = CharacterAgent(
+                            model="gpt-4o-mini",
+                            writing_style_guide=custom_style
+                        )
 
                         # Use initial description if available
                         initial_desc = None
@@ -726,7 +956,7 @@ def story_outline_page():
     """Page for generating story outline"""
     st.header("📋 Story Outline")
     st.markdown("Generate a 17-chapter outline following the Hero's Journey structure.")
-    
+
     if not all([
         hasattr(st.session_state, 'story_concept'),
         st.session_state.generated_setting,
@@ -734,7 +964,39 @@ def story_outline_page():
     ]):
         st.warning("⚠️ Please complete all previous steps first.")
         return
-    
+
+    # Outliner Style Guide Section
+    with st.expander("✍️ Outliner Writing Style Guide", expanded=False):
+        st.markdown("Customize how the AI creates your story outline:")
+
+        # Get default style guide
+        from outliner_agent import OutlinerAgent
+        outline_agent = OutlinerAgent()
+        default_outline_guide = outline_agent._get_default_style_guide()
+
+        current_outline_guide = st.session_state.get('outliner_style_guide') or default_outline_guide
+        outline_guide = st.text_area(
+            "Story Outlining Style Guidelines:",
+            value=current_outline_guide,
+            height=150,
+            key="outline_style_input_main",
+            help="Guidelines for story structure and outlining"
+        )
+
+        col1, col2 = st.columns(2)
+        with col1:
+            if st.button("💾 Save Style Guide", key="save_outline_style"):
+                st.session_state.outliner_style_guide = outline_guide
+                save_current_story()
+                st.success("✅ Outliner style guide saved!")
+
+        with col2:
+            if st.button("🔄 Reset to Default", key="reset_outline_main"):
+                st.session_state.outliner_style_guide = None
+                save_current_story()
+                st.success("✅ Reset to default style guide!")
+                st.rerun()
+
     col1, col2 = st.columns([1, 2])
     
     with col1:
@@ -747,7 +1009,12 @@ def story_outline_page():
         if st.button("📚 Generate 17-Chapter Outline", type="primary"):
             with st.spinner("Creating your story outline..."):
                 try:
-                    outliner = OutlinerAgent(model="gpt-4o-mini")
+                    # Use custom style guide if available
+                    custom_style = st.session_state.get('outliner_style_guide')
+                    outliner = OutlinerAgent(
+                        model="gpt-4o-mini",
+                        writing_style_guide=custom_style
+                    )
                     outline = outliner.generate_outline(
                         st.session_state.story_concept,
                         st.session_state.generated_setting,
@@ -785,7 +1052,12 @@ def story_outline_page():
             if st.button("🔄 Regenerate Outline"):
                 with st.spinner("Regenerating outline..."):
                     try:
-                        outliner = OutlinerAgent(model="gpt-4o-mini")
+                        # Use custom style guide if available
+                        custom_style = st.session_state.get('outliner_style_guide')
+                        outliner = OutlinerAgent(
+                            model="gpt-4o-mini",
+                            writing_style_guide=custom_style
+                        )
                         outline = outliner.generate_outline(
                             st.session_state.story_concept,
                             st.session_state.generated_setting,
@@ -837,10 +1109,11 @@ def generate_markdown_export():
     if st.session_state.get('generated_outline'):
         toc_items.append("- [Story Outline](#story-outline)")
 
-    # Add chapters to TOC
+    # Add chapters to TOC - fix sorting to handle numeric values properly
     if st.session_state.get('generated_chapters'):
         toc_items.append("- [Chapters](#chapters)")
-        completed_chapters = sorted(st.session_state.generated_chapters.keys())
+        # Convert to integers for proper numeric sorting, then back to original type
+        completed_chapters = sorted(st.session_state.generated_chapters.keys(), key=lambda x: int(x))
         for chapter_num in completed_chapters:
             toc_items.append(f"  - [Chapter {chapter_num}](#chapter-{chapter_num})")
 
@@ -857,13 +1130,13 @@ def generate_markdown_export():
         markdown_content.append("## Setting\n")
         markdown_content.append(f"{st.session_state.generated_setting}\n\n")
 
-    # Characters
+    # Characters - fix anchor syntax (remove curly braces)
     if st.session_state.get('generated_characters'):
         markdown_content.append("## Characters\n")
         for role, description in st.session_state.generated_characters.items():
             role_title = role.title().replace('_', ' ')
-            role_anchor = role.lower().replace(' ', '-').replace('_', '-')
-            markdown_content.append(f"### {role_title} {{#{role_anchor}}}\n")
+            # Remove the incorrect {#anchor} syntax - markdown auto-generates anchors
+            markdown_content.append(f"### {role_title}\n")
             markdown_content.append(f"{description}\n\n")
 
     # Story Outline
@@ -871,13 +1144,15 @@ def generate_markdown_export():
         markdown_content.append("## Story Outline\n")
         markdown_content.append(f"{st.session_state.generated_outline}\n\n")
 
-    # Chapters
+    # Chapters - fix anchor syntax and sorting
     if st.session_state.get('generated_chapters'):
         markdown_content.append("## Chapters\n")
-        completed_chapters = sorted(st.session_state.generated_chapters.keys())
+        # Convert to integers for proper numeric sorting, then back to original type
+        completed_chapters = sorted(st.session_state.generated_chapters.keys(), key=lambda x: int(x))
         for chapter_num in completed_chapters:
             chapter_content = st.session_state.generated_chapters[chapter_num]
-            markdown_content.append(f"### Chapter {chapter_num} {{#chapter-{chapter_num}}}\n")
+            # Remove the incorrect {#anchor} syntax - markdown auto-generates anchors
+            markdown_content.append(f"### Chapter {chapter_num}\n")
             markdown_content.append(f"{chapter_content}\n\n")
             markdown_content.append("---\n")  # Separator between chapters
 
@@ -898,7 +1173,12 @@ def generate_all_chapters(chapters_to_generate):
     status_text = st.empty()
 
     try:
-        chapter_writer = ChapterAgent(model="gpt-4o-mini")
+        # Use custom style guide if available
+        custom_style = st.session_state.get('chapter_style_guide')
+        chapter_writer = ChapterAgent(
+            model="gpt-4o-mini",
+            writing_style_guide=custom_style
+        )
 
         for i, chapter_number in enumerate(sorted_chapters):
             # Update progress
@@ -956,7 +1236,7 @@ def chapter_writing_page():
     """Page for writing individual chapters"""
     st.header("✍️ Chapter Writing")
     st.markdown("Write individual chapters based on your story outline.")
-    
+
     if not all([
         hasattr(st.session_state, 'story_concept'),
         st.session_state.generated_setting,
@@ -965,7 +1245,39 @@ def chapter_writing_page():
     ]):
         st.warning("⚠️ Please complete all previous steps first.")
         return
-    
+
+    # Chapter Style Guide Section
+    with st.expander("✍️ Chapter Writing Style Guide", expanded=False):
+        st.markdown("Customize how the AI writes your chapters:")
+
+        # Get default style guide
+        from chapter_agent import ChapterAgent
+        chapter_agent = ChapterAgent()
+        default_chapter_guide = chapter_agent._get_default_style_guide()
+
+        current_chapter_guide = st.session_state.get('chapter_style_guide') or default_chapter_guide
+        chapter_guide = st.text_area(
+            "Chapter Writing Style Guidelines:",
+            value=current_chapter_guide,
+            height=150,
+            key="chapter_style_input_main",
+            help="Guidelines for chapter writing and narrative style"
+        )
+
+        col1, col2 = st.columns(2)
+        with col1:
+            if st.button("💾 Save Style Guide", key="save_chapter_style"):
+                st.session_state.chapter_style_guide = chapter_guide
+                save_current_story()
+                st.success("✅ Chapter style guide saved!")
+
+        with col2:
+            if st.button("🔄 Reset to Default", key="reset_chapter_main"):
+                st.session_state.chapter_style_guide = None
+                save_current_story()
+                st.success("✅ Reset to default style guide!")
+                st.rerun()
+
     col1, col2 = st.columns([1, 2])
     
     with col1:
@@ -986,7 +1298,12 @@ def chapter_writing_page():
         if st.button(f"✍️ Write Chapter {chapter_number}", type="primary"):
             with st.spinner(f"Writing Chapter {chapter_number}..."):
                 try:
-                    chapter_writer = ChapterAgent(model="gpt-4o-mini")
+                    # Use custom style guide if available
+                    custom_style = st.session_state.get('chapter_style_guide')
+                    chapter_writer = ChapterAgent(
+                        model="gpt-4o-mini",
+                        writing_style_guide=custom_style
+                    )
 
                     # Get previous chapter if it exists
                     previous_chapter = None

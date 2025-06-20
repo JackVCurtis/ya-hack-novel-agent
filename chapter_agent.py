@@ -1,31 +1,28 @@
-from openai import OpenAI
+from abstract_writer_agent import AbstractWriterAgent
 from typing import Dict, Optional
 
 
-class ChapterAgent:
+class ChapterAgent(AbstractWriterAgent):
     """
     A specialized agent for writing complete chapters of young adult fiction.
     
     This agent takes a chapter outline, character descriptions, setting, and optional
-    previous chapter to write a full chapter with proper structure including sensory
+    previous chapter to write a full chapter with proper structure including
     opening, rising action, and falling action.
     """
     
-    def __init__(self, model: str = "gpt-4o-mini", api_key: str = None):
+    def __init__(self, model: str = "gpt-4o-mini", api_key: str = None,
+                 writing_style_guide: Optional[str] = None):
         """
         Initialize the ChapterAgent.
 
         Args:
             model: The OpenAI model to use (default: gpt-4o-mini)
             api_key: OpenAI API key (if None, will use environment variable)
+            writing_style_guide: Optional text containing writing style guidelines.
+                                If None, uses the default chapter writing style guide
         """
-        self.model = model
-        self.client = OpenAI(api_key=api_key)
-        self.system_instructions = self._get_instructions()
-
-    def _initialize_client(self):
-        """Initialize the OpenAI client - kept for compatibility."""
-        pass  # No longer needed with OpenAI client
+        super().__init__(model, api_key, writing_style_guide)
     
     def _get_instructions(self) -> str:
         """Get the specialized instructions for the chapter writing agent."""
@@ -34,8 +31,8 @@ class ChapterAgent:
         
         CHAPTER STRUCTURE REQUIREMENTS:
         
-        1. SENSORY OPENING (1-2 paragraphs):
-        - Begin with vivid sensory details that immediately establish mood and atmosphere
+        1. EVOCATIVE OPENING (1-2 paragraphs):
+        - Begin with vivid details that immediately establish mood and atmosphere
         - Use sight, sound, smell, touch, or taste to ground the reader in the scene
         - Set the emotional tone for the chapter
         - Avoid starting with dialogue or action - lead with atmosphere
@@ -74,11 +71,46 @@ class ChapterAgent:
         Focus on creating chapters that:
         - Hook readers from the first sentence
         - Maintain engagement throughout
-        - Feel authentic to the YA experience
         - Advance both plot and character development
         - Leave readers wanting to continue"""
-    
-    def write_chapter(self, chapter_outline: str, characters: Dict[str, str], 
+
+    def _get_default_style_guide(self) -> str:
+        """Get the default writing style guide for chapter writing."""
+        return """CHAPTER WRITING STYLE GUIDE:
+AVOID RUN-ON SENTENCES
+
+NARRATIVE STRUCTURE:
+- Begin each chapter with details that establish mood and atmosphere
+- Build rising action progressively with clear story beats
+- Include a climactic moment or turning point within the chapter
+- End with falling action that resolves immediate tension while creating intrigue
+
+WRITING STYLE:
+- Use third person limited POV for intimate character connection
+- Write 3,000-4,500 words per chapter for substantial content
+- Balance action, dialogue, and internal thoughts effectively
+- Create authentic teenage voices and concerns
+
+CHARACTER DEVELOPMENT:
+- Show character growth through actions and decisions
+- Include meaningful dialogue that reveals personality
+- Demonstrate relationships and character dynamics
+- Allow characters to drive the plot through their choices
+
+PACING AND FLOW:
+- Vary sentence structure and paragraph length for rhythm
+- Use scene breaks and transitions effectively
+- Maintain a fast and exciting pace
+- Create compelling hooks and chapter endings
+
+EVOCATIVE AND ATMOSPHERIC DETAILS:
+- Include details that ground readers in the scene
+- DO NOT USE SIMILIES, in the form of "like" or "as"
+- use metaphor sparingly to emphasize important details
+- Balance description with action and dialogue
+"""
+
+    def write_chapter(self, chapter_outline: str, characters: Dict[str, str],
                      setting_description: str, chapter_number: int,
                      previous_chapter: Optional[str] = None, verbose: bool = True) -> str:
         """
@@ -99,23 +131,33 @@ class ChapterAgent:
         
         if verbose:
             print(f"ChapterAgent> Writing Chapter {chapter_number}...")
-            print("ChapterAgent> Step 1: Generating detailed writing prompt...")
 
-        # Step 1: Generate a detailed prompt for writing the chapter
-        detailed_prompt = self._generate_chapter_prompt(
-            chapter_outline, characters, setting_description,
-            chapter_number, previous_chapter, verbose
+        # Use the parent class's two-step generation method
+        return self._execute_two_step_generation(
+            step1_args=(chapter_outline, characters, setting_description, chapter_number),
+            step1_kwargs={'previous_chapter': previous_chapter, 'verbose': verbose},
+            step2_args=(),
+            step2_kwargs={'chapter_number': chapter_number, 'verbose': verbose},
+            verbose=verbose,
+            agent_name="ChapterAgent"
         )
 
-        if verbose:
-            print("ChapterAgent> Step 2: Writing chapter using generated prompt...")
-
-        # Step 2: Use the detailed prompt to write the actual chapter
-        chapter_content = self._write_chapter_from_prompt(
-            detailed_prompt, chapter_number, verbose
+    def _generate_detailed_prompt(self, chapter_outline: str, characters: Dict[str, str],
+                                 setting_description: str, chapter_number: int,
+                                 previous_chapter: Optional[str] = None, verbose: bool = True) -> str:
+        """
+        Implementation of abstract method for generating detailed prompts.
+        """
+        return self._generate_chapter_prompt(
+            chapter_outline, characters, setting_description, chapter_number, previous_chapter, verbose
         )
 
-        return chapter_content
+    def _create_content_from_prompt(self, detailed_prompt: str, chapter_number: int = None,
+                                   verbose: bool = True) -> str:
+        """
+        Implementation of abstract method for creating content from prompts.
+        """
+        return self._write_chapter_from_prompt(detailed_prompt, chapter_number, verbose)
 
     def _generate_chapter_prompt(self, chapter_outline: str, characters: Dict[str, str],
                                 setting_description: str, chapter_number: int,
@@ -167,7 +209,7 @@ Based on the above information, create a detailed writing prompt that will resul
 1. SPECIFIC SCENE DETAILS: What exactly happens in this chapter, scene by scene
 2. CHARACTER DEVELOPMENT: How characters should grow or change
 3. DIALOGUE GUIDANCE: Key conversations that need to happen
-4. SENSORY DETAILS: Specific atmospheric and sensory elements to include
+4. EVOCATIVE DETAILS: Specific atmospheric and elements to include
 5. PACING INSTRUCTIONS: How to structure the rising and falling action
 6. EMOTIONAL BEATS: What emotions should be evoked and when
 7. PLOT ADVANCEMENT: How this chapter moves the overall story forward
@@ -175,17 +217,12 @@ Based on the above information, create a detailed writing prompt that will resul
 
 Create a comprehensive prompt that will result in a substantial, well-developed chapter that feels authentic to the YA genre and advances both character and plot development significantly."""
 
-        response = self.client.chat.completions.create(
-            model=self.model,
-            messages=[
-                {"role": "system", "content": "You are an expert writing coach who creates detailed prompts for writing compelling young adult fiction chapters."},
-                {"role": "user", "content": prompt_generation_request}
-            ],
+        return self._make_api_call(
+            system_content="You are an expert writing coach who creates detailed prompts for writing compelling young adult fiction chapters.",
+            user_content=prompt_generation_request,
             temperature=0.6,
             max_tokens=2000
         )
-
-        return response.choices[0].message.content.strip()
 
     def _write_chapter_from_prompt(self, detailed_prompt: str, chapter_number: int,
                                   verbose: bool = True) -> str:
@@ -206,31 +243,26 @@ WRITING REQUIREMENTS:
 - Write 3,000-4,500 words
 - Use third person limited POV
 - Create authentic teenage voices and concerns
-- Include rich sensory details and atmospheric descriptions
+- Include rich details and atmospheric descriptions
 - Balance action, dialogue, and internal thoughts
 - Show character growth and development
 - Maintain appropriate pacing for YA readers
 - End with emotional impact or compelling hook
 
 CHAPTER STRUCTURE:
-1. SENSORY OPENING (2-3 paragraphs): Begin with vivid sensory details that immediately establish mood and atmosphere
+1. EVOCATIVE OPENING (2-3 paragraphs): Begin with vivid details that immediately establish mood and atmosphere
 2. RISING ACTION (majority of chapter): Build tension progressively with character development and plot advancement
 3. CLIMAX/TURNING POINT: A significant moment of conflict, revelation, or change
 4. FALLING ACTION & RESOLUTION: Resolve immediate chapter tension while setting up future intrigue
 
 Focus on creating a chapter that feels substantial, emotionally resonant, and advances both character and plot in meaningful ways."""
 
-        response = self.client.chat.completions.create(
-            model=self.model,
-            messages=[
-                {"role": "system", "content": chapter_writing_instructions},
-                {"role": "user", "content": detailed_prompt}
-            ],
+        return self._make_api_call(
+            system_content=chapter_writing_instructions,
+            user_content=detailed_prompt,
             temperature=0.7,
             max_tokens=6000  # Increased for longer chapters
         )
-
-        return response.choices[0].message.content.strip()
 
     def _create_prompt(self, chapter_outline: str, characters: Dict[str, str],
                       setting_description: str, chapter_number: int,
@@ -267,7 +299,7 @@ CHARACTERS:
 {previous_context}
 
 CHAPTER STRUCTURE REQUIREMENTS:
-1. Begin with 1-2 paragraphs of sensory description that sets the mood and atmosphere
+1. Begin with 1-2 paragraphs of description that sets the mood and atmosphere
 2. Build rising action that follows the outline while developing characters and advancing plot
 3. Include meaningful dialogue and character interactions
 4. End with falling action that resolves the chapter's immediate conflict while setting up future intrigue
@@ -366,7 +398,7 @@ Create a detailed writing prompt that will result in a rich, engaging Chapter {c
 1. POV-SPECIFIC SCENE DETAILS: What {pov_character} experiences, sees, thinks, and feels
 2. INTERNAL MONOLOGUE GUIDANCE: {pov_character}'s thoughts, reactions, and emotional journey
 3. DIALOGUE FROM POV: How {pov_character} speaks and interprets others' words
-4. SENSORY EXPERIENCE: What {pov_character} specifically notices through their senses
+4. EVOCATIVE EXPERIENCE: What {pov_character} specifically notices through their senses
 5. CHARACTER VOICE: How to capture {pov_character}'s unique personality and speech patterns
 6. EMOTIONAL BEATS: {pov_character}'s emotional arc throughout the chapter
 7. RELATIONSHIP DYNAMICS: How {pov_character} views and interacts with other characters
@@ -374,17 +406,12 @@ Create a detailed writing prompt that will result in a rich, engaging Chapter {c
 
 Ensure the prompt will create a chapter that feels authentic to {pov_character}'s voice while advancing the overall story."""
 
-        response = self.client.chat.completions.create(
-            model=self.model,
-            messages=[
-                {"role": "system", "content": "You are an expert writing coach who creates detailed prompts for POV-specific young adult fiction chapters."},
-                {"role": "user", "content": pov_prompt_request}
-            ],
+        return self._make_api_call(
+            system_content="You are an expert writing coach who creates detailed prompts for POV-specific young adult fiction chapters.",
+            user_content=pov_prompt_request,
             temperature=0.6,
             max_tokens=2000
         )
-
-        return response.choices[0].message.content.strip()
     
     def update_instructions(self, custom_instructions: str):
         """

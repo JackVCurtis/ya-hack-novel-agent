@@ -1,8 +1,8 @@
-from openai import OpenAI
-from typing import Dict, List
+from abstract_writer_agent import AbstractWriterAgent
+from typing import Dict, Optional
 
 
-class OutlinerAgent:
+class OutlinerAgent(AbstractWriterAgent):
     """
     A specialized agent for creating structured young adult fiction outlines.
     
@@ -10,21 +10,18 @@ class OutlinerAgent:
     to produce a 17-chapter outline following the Hero's Journey structure.
     """
     
-    def __init__(self, model: str = "gpt-4o-mini", api_key: str = None):
+    def __init__(self, model: str = "gpt-4o-mini", api_key: str = None,
+                 writing_style_guide: Optional[str] = None):
         """
         Initialize the OutlinerAgent.
 
         Args:
             model: The OpenAI model to use (default: gpt-4o-mini)
             api_key: OpenAI API key (if None, will use environment variable)
+            writing_style_guide: Optional text containing writing style guidelines.
+                                If None, uses the default outlining style guide
         """
-        self.model = model
-        self.client = OpenAI(api_key=api_key)
-        self.system_instructions = self._get_instructions()
-
-    def _initialize_client(self):
-        """Initialize the OpenAI client - kept for compatibility."""
-        pass  # No longer needed with OpenAI client
+        super().__init__(model, api_key, writing_style_guide)
     
     def _get_instructions(self) -> str:
         """Get the specialized instructions for the outline creation agent."""
@@ -80,7 +77,35 @@ class OutlinerAgent:
         - Proper pacing across all three acts
         - Integration of setting elements
         - Utilization of all major characters"""
-    
+
+    def _get_default_style_guide(self) -> str:
+        """Get the default writing style guide for outlining."""
+        return """OUTLINING STYLE GUIDE:
+
+STRUCTURE PRINCIPLES:
+- Follow the Hero's Journey framework adapted for YA fiction
+- Ensure clear three-act structure with proper pacing
+- Balance character development with plot advancement
+- Create compelling chapter hooks and cliffhangers
+
+CHAPTER ORGANIZATION:
+- Each chapter should have a clear purpose and advance the story
+- Include both external plot events and internal character growth
+- Vary chapter types (action, character development, world-building, etc.)
+- End chapters with emotional impact or compelling questions
+
+PACING GUIDELINES:
+- Front-load world-building and character introduction in early chapters
+- Build tension progressively through the middle chapters
+- Create multiple climactic moments leading to the final confrontation
+- Allow for proper resolution and character arc completion
+
+NARRATIVE FLOW:
+- Ensure smooth transitions between chapters and story beats
+- Create satisfying character arcs that span the entire narrative
+- Build subplots that enhance rather than distract from the main story
+- Develop conflicts that escalate naturally and resolve meaningfully"""
+
     def generate_outline(self, novel_concept: str, setting_description: str,
                         characters: Dict[str, str], verbose: bool = True) -> str:
         """
@@ -101,22 +126,29 @@ class OutlinerAgent:
             print("OutlinerAgent> Creating 17-chapter outline...")
             print("OutlinerAgent> Novel concept:", novel_concept[:50] + "...")
             print("OutlinerAgent> Characters:", list(characters.keys()))
-            print("OutlinerAgent> Step 1: Generating detailed outline prompt...")
 
-        # Step 1: Generate a detailed prompt for outline creation
-        detailed_prompt = self._generate_outline_prompt(
-            novel_concept, setting_description, characters, verbose
+        # Use the parent class's two-step generation method
+        return self._execute_two_step_generation(
+            step1_args=(novel_concept, setting_description, characters),
+            step1_kwargs={'verbose': verbose},
+            step2_args=(),
+            step2_kwargs={'verbose': verbose},
+            verbose=verbose,
+            agent_name="OutlinerAgent"
         )
 
-        if verbose:
-            print("OutlinerAgent> Step 2: Creating outline using generated prompt...")
+    def _generate_detailed_prompt(self, novel_concept: str, setting_description: str,
+                                 characters: Dict[str, str], verbose: bool = True) -> str:
+        """
+        Implementation of abstract method for generating detailed prompts.
+        """
+        return self._generate_outline_prompt(novel_concept, setting_description, characters, verbose)
 
-        # Step 2: Use the detailed prompt to create the actual outline
-        outline_content = self._create_outline_from_prompt(
-            detailed_prompt, verbose
-        )
-
-        return outline_content
+    def _create_content_from_prompt(self, detailed_prompt: str, verbose: bool = True) -> str:
+        """
+        Implementation of abstract method for creating content from prompts.
+        """
+        return self._create_outline_from_prompt(detailed_prompt, verbose)
 
     def _generate_outline_prompt(self, novel_concept: str, setting_description: str,
                                 characters: Dict[str, str], verbose: bool = True) -> str:
@@ -169,17 +201,12 @@ The outline should be divided into:
 
 Create a comprehensive prompt that will result in a detailed outline that serves as a strong foundation for writing a compelling YA novel."""
 
-        response = self.client.chat.completions.create(
-            model=self.model,
-            messages=[
-                {"role": "system", "content": "You are an expert story structure consultant who creates detailed prompts for developing compelling young adult fiction outlines."},
-                {"role": "user", "content": prompt_generation_request}
-            ],
+        return self._make_api_call(
+            system_content="You are an expert story structure consultant who creates detailed prompts for developing compelling young adult fiction outlines.",
+            user_content=prompt_generation_request,
             temperature=0.6,
             max_tokens=2000
         )
-
-        return response.choices[0].message.content.strip()
 
     def _create_outline_from_prompt(self, detailed_prompt: str, verbose: bool = True) -> str:
         """
@@ -219,17 +246,12 @@ For each chapter, provide:
 
 Focus on creating an outline that provides a strong foundation for writing a compelling YA novel that will engage teenage readers while following proven story structure principles."""
 
-        response = self.client.chat.completions.create(
-            model=self.model,
-            messages=[
-                {"role": "system", "content": outline_creation_instructions},
-                {"role": "user", "content": detailed_prompt}
-            ],
+        return self._make_api_call(
+            system_content=outline_creation_instructions,
+            user_content=detailed_prompt,
             temperature=0.7,
             max_tokens=4000
         )
-
-        return response.choices[0].message.content.strip()
 
     def _create_prompt(self, novel_concept: str, setting_description: str,
                       characters: Dict[str, str]) -> str:
@@ -380,17 +402,12 @@ Based on the above information, create a detailed chapter breakdown prompt that 
 
 Create a comprehensive prompt that will result in a detailed chapter breakdown that serves as a strong foundation for writing Chapter {chapter_number} of a compelling YA novel."""
 
-        response = self.client.chat.completions.create(
-            model=self.model,
-            messages=[
-                {"role": "system", "content": "You are an expert story structure consultant who creates detailed prompts for developing compelling young adult fiction chapter breakdowns."},
-                {"role": "user", "content": prompt_generation_request}
-            ],
+        return self._make_api_call(
+            system_content="You are an expert story structure consultant who creates detailed prompts for developing compelling young adult fiction chapter breakdowns.",
+            user_content=prompt_generation_request,
             temperature=0.6,
             max_tokens=2000
         )
-
-        return response.choices[0].message.content.strip()
 
     def _create_chapter_breakdown_from_prompt(self, detailed_prompt: str, chapter_number: int,
                                             verbose: bool = True) -> str:
@@ -434,17 +451,12 @@ BREAKDOWN STRUCTURE:
 
 Focus on creating a breakdown that provides clear, detailed guidance for writing a compelling chapter that serves its role in the overall story structure."""
 
-        response = self.client.chat.completions.create(
-            model=self.model,
-            messages=[
-                {"role": "system", "content": breakdown_creation_instructions},
-                {"role": "user", "content": detailed_prompt}
-            ],
+        return self._make_api_call(
+            system_content=breakdown_creation_instructions,
+            user_content=detailed_prompt,
             temperature=0.7,
             max_tokens=2000
         )
-
-        return response.choices[0].message.content.strip()
     
     def update_instructions(self, custom_instructions: str):
         """
