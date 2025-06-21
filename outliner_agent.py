@@ -70,7 +70,6 @@ class OutlinerAgent(AbstractWriterAgent):
         5. How it advances the overall plot
         
         Focus on:
-        - Age-appropriate content for YA readers
         - Strong character arcs and growth
         - Compelling conflicts and stakes
         - Emotional resonance and themes
@@ -107,7 +106,8 @@ NARRATIVE FLOW:
 - Develop conflicts that escalate naturally and resolve meaningfully"""
 
     def generate_outline(self, novel_concept: str, setting_description: str,
-                        characters: Dict[str, str], verbose: bool = True) -> str:
+                        characters: Dict[str, str], plot_summary: Optional[str] = None,
+                        verbose: bool = True) -> str:
         """
         Generate a 17-chapter outline following the Hero's Journey structure using a two-step process:
         first generate a detailed prompt, then use that prompt to create the outline.
@@ -116,6 +116,7 @@ NARRATIVE FLOW:
             novel_concept: The overall concept/theme of the novel
             setting_description: Description of the novel's setting/world
             characters: Dictionary of character roles and their descriptions
+            plot_summary: Optional single paragraph plot summary to guide the outline
             verbose: Whether to print progress messages
 
         Returns:
@@ -126,10 +127,12 @@ NARRATIVE FLOW:
             print("OutlinerAgent> Creating 17-chapter outline...")
             print("OutlinerAgent> Novel concept:", novel_concept[:50] + "...")
             print("OutlinerAgent> Characters:", list(characters.keys()))
+            if plot_summary:
+                print("OutlinerAgent> Using plot summary for guidance")
 
         # Use the parent class's two-step generation method
         return self._execute_two_step_generation(
-            step1_args=(novel_concept, setting_description, characters),
+            step1_args=(novel_concept, setting_description, characters, plot_summary),
             step1_kwargs={'verbose': verbose},
             step2_args=(),
             step2_kwargs={'verbose': verbose},
@@ -138,11 +141,12 @@ NARRATIVE FLOW:
         )
 
     def _generate_detailed_prompt(self, novel_concept: str, setting_description: str,
-                                 characters: Dict[str, str], verbose: bool = True) -> str:
+                                 characters: Dict[str, str], plot_summary: Optional[str] = None,
+                                 verbose: bool = True) -> str:
         """
         Implementation of abstract method for generating detailed prompts.
         """
-        return self._generate_outline_prompt(novel_concept, setting_description, characters, verbose)
+        return self._generate_outline_prompt(novel_concept, setting_description, characters, plot_summary, verbose)
 
     def _create_content_from_prompt(self, detailed_prompt: str, verbose: bool = True) -> str:
         """
@@ -151,7 +155,8 @@ NARRATIVE FLOW:
         return self._create_outline_from_prompt(detailed_prompt, verbose)
 
     def _generate_outline_prompt(self, novel_concept: str, setting_description: str,
-                                characters: Dict[str, str], verbose: bool = True) -> str:
+                                characters: Dict[str, str], plot_summary: Optional[str] = None,
+                                verbose: bool = True) -> str:
         """
         Generate a detailed prompt for creating a specific outline.
 
@@ -159,27 +164,29 @@ NARRATIVE FLOW:
             novel_concept: The overall concept/theme of the novel
             setting_description: Description of the novel's setting/world
             characters: Dictionary of character roles and their descriptions
+            plot_summary: Optional single paragraph plot summary to guide the outline
             verbose: Whether to print progress messages
 
         Returns:
             A detailed prompt for creating the outline
         """
         # Format character information
-        character_info = "\n".join([
-            f"{role.upper()}:\n{description}\n"
-            for role, description in characters.items()
-        ])
+        character_info = self._format_character_info(characters)
+
+        # Format plot summary section if provided
+        plot_summary_section = ""
+        if plot_summary:
+            plot_summary_section = self._create_context_section("PLOT SUMMARY", plot_summary)
 
         prompt_generation_request = f"""You are a professional story structure consultant specializing in young adult fiction. Your task is to create a detailed, comprehensive prompt that will guide an AI to develop a compelling 17-chapter outline following the Hero's Journey structure for a YA novel.
 
-NOVEL CONCEPT:
-{novel_concept}
+{self._create_context_section("NOVEL CONCEPT", novel_concept)}
 
-SETTING DESCRIPTION:
-{setting_description}
+{self._create_context_section("SETTING DESCRIPTION", setting_description, max_length=500)}
 
-CHARACTER PROFILES:
-{character_info}
+{self._create_context_section("CHARACTER PROFILES", character_info)}
+
+{plot_summary_section}
 
 Based on the above information, create a detailed outline creation prompt that will result in a rich, well-structured 17-chapter outline. The prompt should include specific guidance for:
 
@@ -188,7 +195,7 @@ Based on the above information, create a detailed outline creation prompt that w
 3. PACING AND STRUCTURE: How to balance action, character development, and plot progression
 4. SETTING UTILIZATION: How to effectively use the world and environment in each part
 5. CONFLICT ESCALATION: How tensions and stakes should build across the three acts
-6. YA THEMES: Age-appropriate themes and concerns that resonate with teenage readers
+6. PLOT SUMMARY ALIGNMENT: {"How to ensure the outline aligns with and expands upon the provided plot summary" if plot_summary else "How to develop compelling plot threads that serve the story"}
 7. CHAPTER TRANSITIONS: How chapters should connect and flow into each other
 8. CLIMAX AND RESOLUTION: How to build to a satisfying climax and meaningful resolution
 9. CHARACTER RELATIONSHIPS: How relationships should develop and change
@@ -198,6 +205,8 @@ The outline should be divided into:
 - Part I (Departure): Chapters 1-6
 - Part II (Initiation): Chapters 7-13
 - Part III (Return): Chapters 14-17
+
+{"Ensure the outline expands upon and stays true to the plot summary while providing detailed chapter-by-chapter structure." if plot_summary else ""}
 
 Create a comprehensive prompt that will result in a detailed outline that serves as a strong foundation for writing a compelling YA novel."""
 
@@ -297,7 +306,7 @@ Ensure the outline:
     
     def generate_detailed_chapter_breakdown(self, novel_concept: str, setting_description: str,
                                           characters: Dict[str, str], chapter_number: int,
-                                          verbose: bool = True) -> str:
+                                          plot_summary: Optional[str] = None, verbose: bool = True) -> str:
         """
         Generate a detailed breakdown for a specific chapter using a two-step process.
 
@@ -306,6 +315,7 @@ Ensure the outline:
             setting_description: Description of the novel's setting/world
             characters: Dictionary of character roles and their descriptions
             chapter_number: The specific chapter to detail (1-17)
+            plot_summary: Optional single paragraph plot summary to guide the breakdown
             verbose: Whether to print progress messages
 
         Returns:
@@ -316,11 +326,13 @@ Ensure the outline:
 
         if verbose:
             print(f"OutlinerAgent> Creating detailed breakdown for Chapter {chapter_number}")
+            if plot_summary:
+                print("OutlinerAgent> Using plot summary for guidance")
             print("OutlinerAgent> Step 1: Generating detailed chapter breakdown prompt...")
 
         # Step 1: Generate a detailed prompt for chapter breakdown
         detailed_prompt = self._generate_chapter_breakdown_prompt(
-            novel_concept, setting_description, characters, chapter_number, verbose
+            novel_concept, setting_description, characters, chapter_number, plot_summary, verbose
         )
 
         if verbose:
@@ -335,7 +347,7 @@ Ensure the outline:
 
     def _generate_chapter_breakdown_prompt(self, novel_concept: str, setting_description: str,
                                          characters: Dict[str, str], chapter_number: int,
-                                         verbose: bool = True) -> str:
+                                         plot_summary: Optional[str] = None, verbose: bool = True) -> str:
         """
         Generate a detailed prompt for creating a specific chapter breakdown.
 
@@ -344,6 +356,7 @@ Ensure the outline:
             setting_description: Description of the novel's setting/world
             characters: Dictionary of character roles and their descriptions
             chapter_number: The specific chapter to detail (1-17)
+            plot_summary: Optional single paragraph plot summary to guide the breakdown
             verbose: Whether to print progress messages
 
         Returns:
@@ -367,21 +380,22 @@ Ensure the outline:
             stage = stages[min(chapter_number - 14, 3)]
 
         # Format character information
-        character_info = "\n".join([
-            f"{role.upper()}:\n{description}\n"
-            for role, description in characters.items()
-        ])
+        character_info = self._format_character_info(characters)
+
+        # Format plot summary section if provided
+        plot_summary_section = ""
+        if plot_summary:
+            plot_summary_section = self._create_context_section("PLOT SUMMARY", plot_summary)
 
         prompt_generation_request = f"""You are a professional story structure consultant specializing in young adult fiction. Your task is to create a detailed, comprehensive prompt that will guide an AI to develop a compelling breakdown for Chapter {chapter_number} of a 17-chapter YA novel.
 
-NOVEL CONCEPT:
-{novel_concept}
+{self._create_context_section("NOVEL CONCEPT", novel_concept)}
 
-SETTING DESCRIPTION:
-{setting_description}
+{self._create_context_section("SETTING DESCRIPTION", setting_description, max_length=500)}
 
-CHARACTER PROFILES:
-{character_info}
+{self._create_context_section("CHARACTER PROFILES", character_info)}
+
+{plot_summary_section}
 
 CHAPTER CONTEXT:
 - Chapter {chapter_number} (Part {part})

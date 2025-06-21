@@ -43,14 +43,22 @@ class ChapterAgent(AbstractWriterAgent):
         - Advance the plot according to the outline
         - Include meaningful dialogue that reveals character
         - Show don't tell - use action and dialogue to convey information
-        - Maintain appropriate pacing for YA readers
         
-        3. FALLING ACTION & CHAPTER END (1-2 paragraphs):
+        3. CLIMAX (1-2 paragraphs):
+        - A significant moment of conflict, revelation, or change
+        - The turning point of the chapter
+        - Should be emotionally impactful
+        - Should advance the plot and character arcs
+        - Should set up the falling action
+        
+        4. FALLING ACTION & CHAPTER END (1-2 paragraphs):
         - Resolve the immediate chapter conflict or tension
         - Provide a sense of completion for this chapter's arc
         - Set up intrigue or questions for the next chapter
         - End with impact - either emotional resonance or compelling hook
         
+        ENSURE THAT THE STORY BEATS OF THE CHAPTER SPECIFIED IN THE OUTLINE ARE ACCOMPLISHED
+
         WRITING STYLE GUIDELINES:
         - Write in third person limited POV (unless specified otherwise)
         - Use age-appropriate language for 13-18 year old readers
@@ -112,7 +120,8 @@ EVOCATIVE AND ATMOSPHERIC DETAILS:
 
     def write_chapter(self, chapter_outline: str, characters: Dict[str, str],
                      setting_description: str, chapter_number: int,
-                     previous_chapter: Optional[str] = None, verbose: bool = True) -> str:
+                     previous_chapter: Optional[str] = None, plot_summary: Optional[str] = None,
+                     verbose: bool = True) -> str:
         """
         Write a complete chapter using a two-step process: first generate a detailed prompt,
         then use that prompt to write a comprehensive chapter.
@@ -123,19 +132,22 @@ EVOCATIVE AND ATMOSPHERIC DETAILS:
             setting_description: Description of the novel's setting/world
             chapter_number: The chapter number being written
             previous_chapter: The text of the previous chapter (if exists)
+            plot_summary: Optional single paragraph plot summary for additional context
             verbose: Whether to print progress messages
 
         Returns:
             A complete chapter with proper structure and pacing
         """
-        
+
         if verbose:
             print(f"ChapterAgent> Writing Chapter {chapter_number}...")
+            if plot_summary:
+                print("ChapterAgent> Using plot summary for additional context")
 
         # Use the parent class's two-step generation method
         return self._execute_two_step_generation(
             step1_args=(chapter_outline, characters, setting_description, chapter_number),
-            step1_kwargs={'previous_chapter': previous_chapter, 'verbose': verbose},
+            step1_kwargs={'previous_chapter': previous_chapter, 'plot_summary': plot_summary, 'verbose': verbose},
             step2_args=(),
             step2_kwargs={'chapter_number': chapter_number, 'verbose': verbose},
             verbose=verbose,
@@ -144,12 +156,13 @@ EVOCATIVE AND ATMOSPHERIC DETAILS:
 
     def _generate_detailed_prompt(self, chapter_outline: str, characters: Dict[str, str],
                                  setting_description: str, chapter_number: int,
-                                 previous_chapter: Optional[str] = None, verbose: bool = True) -> str:
+                                 previous_chapter: Optional[str] = None, plot_summary: Optional[str] = None,
+                                 verbose: bool = True) -> str:
         """
         Implementation of abstract method for generating detailed prompts.
         """
         return self._generate_chapter_prompt(
-            chapter_outline, characters, setting_description, chapter_number, previous_chapter, verbose
+            chapter_outline, characters, setting_description, chapter_number, previous_chapter, plot_summary, verbose
         )
 
     def _create_content_from_prompt(self, detailed_prompt: str, chapter_number: int = None,
@@ -161,7 +174,8 @@ EVOCATIVE AND ATMOSPHERIC DETAILS:
 
     def _generate_chapter_prompt(self, chapter_outline: str, characters: Dict[str, str],
                                 setting_description: str, chapter_number: int,
-                                previous_chapter: Optional[str] = None, verbose: bool = True) -> str:
+                                previous_chapter: Optional[str] = None, plot_summary: Optional[str] = None,
+                                verbose: bool = True) -> str:
         """
         Generate a detailed prompt for writing a specific chapter.
 
@@ -171,16 +185,14 @@ EVOCATIVE AND ATMOSPHERIC DETAILS:
             setting_description: Description of the novel's setting/world
             chapter_number: The chapter number being written
             previous_chapter: The text of the previous chapter (if exists)
+            plot_summary: Optional single paragraph plot summary for additional context
             verbose: Whether to print progress messages
 
         Returns:
             A detailed prompt for writing the chapter
         """
         # Format character information
-        character_info = "\n".join([
-            f"{role.upper()}:\n{description}\n"
-            for role, description in characters.items()
-        ])
+        character_info = self._format_character_info(characters)
 
         # Handle previous chapter context
         previous_context = ""
@@ -192,16 +204,20 @@ PREVIOUS CHAPTER SUMMARY:
 The new chapter should continue seamlessly from this point.
 """
 
+        # Format plot summary section if provided
+        plot_summary_section = ""
+        if plot_summary:
+            plot_summary_section = self._create_context_section("PLOT SUMMARY", plot_summary)
+
         prompt_generation_request = f"""You are a professional writing coach specializing in young adult fiction. Your task is to create a detailed, comprehensive prompt that will guide an AI to write an engaging Chapter {chapter_number} of a YA novel.
 
-COMPLETE BOOK OUTLINE:
-{chapter_outline}
+{self._create_context_section("COMPLETE BOOK OUTLINE", chapter_outline, max_length=2000)}
 
-SETTING DESCRIPTION:
-{setting_description}
+{self._create_context_section("SETTING DESCRIPTION", setting_description, max_length=500)}
 
-CHARACTER PROFILES:
-{character_info}
+{self._create_context_section("CHARACTER PROFILES", character_info)}
+
+{plot_summary_section}
 {previous_context}
 
 Based on the above information, create a detailed writing prompt that will result in a rich, engaging Chapter {chapter_number} that is 3,000-4,500 words long. The prompt should include:
@@ -213,7 +229,10 @@ Based on the above information, create a detailed writing prompt that will resul
 5. PACING INSTRUCTIONS: How to structure the rising and falling action
 6. EMOTIONAL BEATS: What emotions should be evoked and when
 7. PLOT ADVANCEMENT: How this chapter moves the overall story forward
-8. CHAPTER ENDING: Specific guidance on how to end with impact
+8. {"PLOT SUMMARY ALIGNMENT: How to ensure the chapter aligns with and serves the overall plot summary" if plot_summary else "STORY COHERENCE: How to maintain consistency with the overall narrative"}
+9. CHAPTER ENDING: Specific guidance on how to end with impact
+
+{"Ensure the chapter stays true to the plot summary while providing detailed scene-by-scene development." if plot_summary else ""}
 
 Create a comprehensive prompt that will result in a substantial, well-developed chapter that feels authentic to the YA genre and advances both character and plot development significantly."""
 
@@ -319,7 +338,7 @@ Please write the complete chapter now."""
     def write_chapter_with_specific_pov(self, chapter_outline: str, characters: Dict[str, str],
                                        setting_description: str, chapter_number: int,
                                        pov_character: str, previous_chapter: Optional[str] = None,
-                                       verbose: bool = True) -> str:
+                                       plot_summary: Optional[str] = None, verbose: bool = True) -> str:
         """
         Write a chapter from a specific character's point of view using the two-step process.
 
@@ -330,6 +349,7 @@ Please write the complete chapter now."""
             chapter_number: The chapter number being written
             pov_character: The character whose POV to write from
             previous_chapter: The text of the previous chapter (if exists)
+            plot_summary: Optional single paragraph plot summary for additional context
             verbose: Whether to print progress messages
 
         Returns:
@@ -340,12 +360,14 @@ Please write the complete chapter now."""
 
         if verbose:
             print(f"ChapterAgent> Writing Chapter {chapter_number} from {pov_character}'s POV...")
+            if plot_summary:
+                print("ChapterAgent> Using plot summary for additional context")
             print("ChapterAgent> Step 1: Generating POV-specific writing prompt...")
 
         # Step 1: Generate a detailed POV-specific prompt
         detailed_prompt = self._generate_pov_chapter_prompt(
             chapter_outline, characters, setting_description,
-            chapter_number, pov_character, previous_chapter
+            chapter_number, pov_character, previous_chapter, plot_summary
         )
 
         if verbose:
@@ -360,14 +382,12 @@ Please write the complete chapter now."""
 
     def _generate_pov_chapter_prompt(self, chapter_outline: str, characters: Dict[str, str],
                                     setting_description: str, chapter_number: int,
-                                    pov_character: str, previous_chapter: Optional[str] = None) -> str:
+                                    pov_character: str, previous_chapter: Optional[str] = None,
+                                    plot_summary: Optional[str] = None) -> str:
         """Generate a detailed prompt for writing a POV-specific chapter."""
 
         # Format character information
-        character_info = "\n".join([
-            f"{role.upper()}:\n{description}\n"
-            for role, description in characters.items()
-        ])
+        character_info = self._format_character_info(characters)
 
         # Handle previous chapter context
         previous_context = ""
@@ -379,16 +399,20 @@ PREVIOUS CHAPTER SUMMARY:
 The new chapter should continue seamlessly from this point.
 """
 
+        # Format plot summary section if provided
+        plot_summary_section = ""
+        if plot_summary:
+            plot_summary_section = self._create_context_section("PLOT SUMMARY", plot_summary)
+
         pov_prompt_request = f"""You are a professional writing coach specializing in young adult fiction. Create a detailed, comprehensive prompt for writing Chapter {chapter_number} from {pov_character.upper()}'S POINT OF VIEW.
 
-COMPLETE BOOK OUTLINE:
-{chapter_outline}
+{self._create_context_section("COMPLETE BOOK OUTLINE", chapter_outline, max_length=2000)}
 
-SETTING DESCRIPTION:
-{setting_description}
+{self._create_context_section("SETTING DESCRIPTION", setting_description, max_length=500)}
 
-CHARACTER PROFILES:
-{character_info}
+{self._create_context_section("CHARACTER PROFILES", character_info)}
+
+{plot_summary_section}
 
 POV CHARACTER: {pov_character.upper()}
 {previous_context}
