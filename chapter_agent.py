@@ -246,7 +246,7 @@ Create a comprehensive prompt that will result in a substantial, well-developed 
         return self._make_api_call(
             system_content="You are an expert writing coach who creates detailed prompts for writing compelling young adult fiction chapters.",
             user_content=prompt_generation_request,
-            temperature=0.6,
+            temperature=0.8,
             max_tokens=2000
         )
 
@@ -458,7 +458,7 @@ Ensure the prompt will create a chapter that feels authentic to {pov_character}'
         return self._make_api_call(
             system_content="You are an expert writing coach who creates detailed prompts for POV-specific young adult fiction chapters.",
             user_content=pov_prompt_request,
-            temperature=0.6,
+            temperature=0.8,
             max_tokens=2000
         )
     

@@ -84,9 +84,22 @@ def save_story_to_db(story_id, data):
     conn = sqlite3.connect('ya_novel_generator.db')
     cursor = conn.cursor()
 
-    # Convert complex data to JSON strings
-    characters_json = json.dumps(data.get('generated_characters')) if data.get('generated_characters') else None
-    chapters_json = json.dumps(data.get('generated_chapters')) if data.get('generated_chapters') else None
+    # Convert complex data to JSON strings with error handling
+    characters_json = None
+    if data.get('generated_characters'):
+        try:
+            characters_json = json.dumps(data.get('generated_characters'))
+        except (TypeError, ValueError) as e:
+            print(f"Warning: Failed to serialize generated_characters to JSON: {e}")
+            characters_json = None
+
+    chapters_json = None
+    if data.get('generated_chapters'):
+        try:
+            chapters_json = json.dumps(data.get('generated_chapters'))
+        except (TypeError, ValueError) as e:
+            print(f"Warning: Failed to serialize generated_chapters to JSON: {e}")
+            chapters_json = None
 
     cursor.execute('''
         INSERT OR REPLACE INTO stories
@@ -140,11 +153,26 @@ def load_story_from_db(story_id):
 
         data = dict(zip(columns, row[:len(columns)]))
 
-        # Parse JSON fields back to objects
+        # Parse JSON fields back to objects with error handling
         if data['generated_characters']:
-            data['generated_characters'] = json.loads(data['generated_characters'])
+            try:
+                if isinstance(data['generated_characters'], str) and data['generated_characters'].strip():
+                    data['generated_characters'] = json.loads(data['generated_characters'])
+                elif not isinstance(data['generated_characters'], (dict, list)):
+                    data['generated_characters'] = None
+            except (json.JSONDecodeError, TypeError) as e:
+                print(f"Warning: Failed to parse generated_characters JSON: {e}")
+                data['generated_characters'] = None
+
         if data['generated_chapters']:
-            data['generated_chapters'] = json.loads(data['generated_chapters'])
+            try:
+                if isinstance(data['generated_chapters'], str) and data['generated_chapters'].strip():
+                    data['generated_chapters'] = json.loads(data['generated_chapters'])
+                elif not isinstance(data['generated_chapters'], (dict, list)):
+                    data['generated_chapters'] = None
+            except (json.JSONDecodeError, TypeError) as e:
+                print(f"Warning: Failed to parse generated_chapters JSON: {e}")
+                data['generated_chapters'] = None
 
         return data
     return None
@@ -169,6 +197,55 @@ def delete_story_from_db(story_id):
     cursor.execute('DELETE FROM stories WHERE id = ?', (story_id,))
     conn.commit()
     conn.close()
+
+
+def repair_database_json():
+    """Repair corrupted JSON data in the database"""
+    conn = sqlite3.connect('ya_novel_generator.db')
+    cursor = conn.cursor()
+
+    try:
+        cursor.execute('SELECT id, generated_characters, generated_chapters FROM stories')
+        rows = cursor.fetchall()
+
+        for story_id, characters_json, chapters_json in rows:
+            needs_update = False
+            new_characters = None
+            new_chapters = None
+
+            # Check and fix characters JSON
+            if characters_json:
+                try:
+                    json.loads(characters_json)
+                except (json.JSONDecodeError, TypeError):
+                    print(f"Fixing corrupted characters JSON for story {story_id}")
+                    new_characters = None
+                    needs_update = True
+
+            # Check and fix chapters JSON
+            if chapters_json:
+                try:
+                    json.loads(chapters_json)
+                except (json.JSONDecodeError, TypeError):
+                    print(f"Fixing corrupted chapters JSON for story {story_id}")
+                    new_chapters = None
+                    needs_update = True
+
+            # Update the record if needed
+            if needs_update:
+                cursor.execute('''
+                    UPDATE stories
+                    SET generated_characters = ?, generated_chapters = ?
+                    WHERE id = ?
+                ''', (new_characters, new_chapters, story_id))
+
+        conn.commit()
+        print("Database JSON repair completed")
+
+    except Exception as e:
+        print(f"Error during database repair: {e}")
+    finally:
+        conn.close()
 
 
 def initialize_session_state():
@@ -232,27 +309,34 @@ def save_current_story():
 
 
 def load_story_into_session(story_id):
-    """Load a story from database into session state"""
-    data = load_story_from_db(story_id)
-    if data:
-        st.session_state.current_story_id = data['id']
-        st.session_state.story_title = data['title'] or 'Untitled Story'
-        st.session_state.story_concept = data['story_concept']
-        st.session_state.initial_setting = data['initial_setting']
-        st.session_state.protagonist_desc = data['protagonist_desc']
-        st.session_state.antagonist_desc = data['antagonist_desc']
-        st.session_state.generated_setting = data['generated_setting']
-        st.session_state.generated_characters = data['generated_characters']
-        st.session_state.generated_plot_summary = data.get('generated_plot_summary')
-        st.session_state.generated_outline = data['generated_outline']
-        st.session_state.generated_chapters = data['generated_chapters'] or {}
+    """Load a story from database into session state with error handling"""
+    try:
+        data = load_story_from_db(story_id)
+        if data:
+            st.session_state.current_story_id = data['id']
+            st.session_state.story_title = data['title'] or 'Untitled Story'
+            st.session_state.story_concept = data['story_concept']
+            st.session_state.initial_setting = data['initial_setting']
+            st.session_state.protagonist_desc = data['protagonist_desc']
+            st.session_state.antagonist_desc = data['antagonist_desc']
+            st.session_state.generated_setting = data['generated_setting']
+            st.session_state.generated_characters = data['generated_characters']
+            st.session_state.generated_plot_summary = data.get('generated_plot_summary')
+            st.session_state.generated_outline = data['generated_outline']
+            st.session_state.generated_chapters = data['generated_chapters'] or {}
 
-        # Load style guides if they exist
-        st.session_state.worldbuilder_style_guide = data.get('worldbuilder_style_guide')
-        st.session_state.character_style_guide = data.get('character_style_guide')
-        st.session_state.plot_summary_style_guide = data.get('plot_summary_style_guide')
-        st.session_state.outliner_style_guide = data.get('outliner_style_guide')
-        st.session_state.chapter_style_guide = data.get('chapter_style_guide')
+            # Load style guides if they exist
+            st.session_state.worldbuilder_style_guide = data.get('worldbuilder_style_guide')
+            st.session_state.character_style_guide = data.get('character_style_guide')
+            st.session_state.plot_summary_style_guide = data.get('plot_summary_style_guide')
+            st.session_state.outliner_style_guide = data.get('outliner_style_guide')
+            st.session_state.chapter_style_guide = data.get('chapter_style_guide')
+            return True
+        return False
+    except Exception as e:
+        print(f"Error loading story {story_id}: {e}")
+        st.error(f"Failed to load story: {str(e)}")
+        return False
 
 
 
@@ -315,9 +399,11 @@ def main():
 
         if st.sidebar.button("📂 Load Selected Story"):
             story_id = story_options[selected_story]
-            load_story_into_session(story_id)
-            st.sidebar.success("Story loaded!")
-            st.rerun()
+            if load_story_into_session(story_id):
+                st.sidebar.success("Story loaded!")
+                st.rerun()
+            else:
+                st.sidebar.error("Failed to load story. Please check the console for details.")
 
         # Delete story option
         if st.sidebar.button("🗑️ Delete Selected Story", type="secondary"):
@@ -327,6 +413,14 @@ def main():
             st.rerun()
     else:
         st.sidebar.info("No saved stories found.")
+
+    # Database repair option (only show if there are stories)
+    if stories:
+        st.sidebar.write("---")
+        if st.sidebar.button("🔧 Repair Database", help="Fix corrupted JSON data in saved stories"):
+            with st.spinner("Repairing database..."):
+                repair_database_json()
+                st.sidebar.success("Database repair completed!")
 
 
 
