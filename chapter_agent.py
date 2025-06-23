@@ -246,7 +246,7 @@ Create a comprehensive prompt that will result in a substantial, well-developed 
         return self._make_api_call(
             system_content="You are an expert writing coach who creates detailed prompts for writing compelling young adult fiction chapters.",
             user_content=prompt_generation_request,
-            temperature=0.8,
+            temperature=0.6,
             max_tokens=2000
         )
 
@@ -274,11 +274,11 @@ CRITICAL REQUIREMENTS:
 WRITING REQUIREMENTS:
 - Write 3,000-4,500 words as one continuous narrative
 - Use third person limited POV from ONE character's perspective throughout
-- Create authentic teenage voices and concerns
+- Create authentic voices and concerns
 - Include rich details and atmospheric descriptions as seen by the POV character
 - Balance action, dialogue, and internal thoughts from the POV character's experience
 - Show character growth and development through the POV character's journey
-- Maintain appropriate pacing for YA readers
+- Maintain appropriately quick pacing
 - End with emotional impact or compelling hook
 
 CHAPTER STRUCTURE (as one continuous narrative):
@@ -458,7 +458,7 @@ Ensure the prompt will create a chapter that feels authentic to {pov_character}'
         return self._make_api_call(
             system_content="You are an expert writing coach who creates detailed prompts for POV-specific young adult fiction chapters.",
             user_content=pov_prompt_request,
-            temperature=0.8,
+            temperature=0.6,
             max_tokens=2000
         )
     

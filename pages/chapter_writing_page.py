@@ -3,6 +3,7 @@ Chapter Writing page for the YA Novel Generator.
 """
 import streamlit as st
 import time
+import re
 from .abstract_page import AbstractPage
 from chapter_agent import ChapterAgent
 
@@ -70,7 +71,7 @@ class ChapterWritingPage(AbstractPage):
 
                     # Using the full outline for now - in a real app, you'd extract the specific chapter outline
                     chapter = chapter_writer.write_chapter(
-                        chapter_outline=st.session_state.generated_outline,
+                        chapter_outline=re.search('\*\*Chapter {chapter_number}:(.*)\*\*', st.session_state.generated_outline).group(1),
                         characters=st.session_state.generated_characters,
                         setting_description=st.session_state.generated_setting,
                         chapter_number=chapter_number,

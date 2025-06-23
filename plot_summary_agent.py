@@ -180,7 +180,7 @@ Create a comprehensive prompt that will result in a plot summary that feels dyna
         return self._make_api_call(
             system_content="You are an expert plot development consultant who creates detailed prompts for developing compelling young adult fiction plot summaries.",
             user_content=prompt_generation_request,
-            temperature=0.8,
+            temperature=0.6,
             max_tokens=2000
         )
 
