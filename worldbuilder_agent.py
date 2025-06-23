@@ -149,7 +149,7 @@ Create a comprehensive prompt that will result in a setting description that fee
         return self._make_api_call(
             system_content="You are an expert worldbuilding consultant who creates detailed prompts for developing compelling young adult fiction settings.",
             user_content=prompt_generation_request,
-            temperature=0.6,
+            temperature=0.8,
             max_tokens=2000
         )
 

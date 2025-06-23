@@ -213,7 +213,7 @@ Create a comprehensive prompt that will result in a detailed outline that serves
         return self._make_api_call(
             system_content="You are an expert story structure consultant who creates detailed prompts for developing compelling young adult fiction outlines.",
             user_content=prompt_generation_request,
-            temperature=0.6,
+            temperature=0.8,
             max_tokens=2000
         )
 
@@ -419,7 +419,7 @@ Create a comprehensive prompt that will result in a detailed chapter breakdown t
         return self._make_api_call(
             system_content="You are an expert story structure consultant who creates detailed prompts for developing compelling young adult fiction chapter breakdowns.",
             user_content=prompt_generation_request,
-            temperature=0.6,
+            temperature=0.8,
             max_tokens=2000
         )
 

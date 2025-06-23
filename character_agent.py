@@ -226,7 +226,7 @@ Create a comprehensive prompt that will result in a detailed character profile t
         return self._make_api_call(
             system_content="You are an expert character development coach who creates detailed prompts for developing compelling young adult fiction characters.",
             user_content=prompt_generation_request,
-            temperature=0.6,
+            temperature=0.8,
             max_tokens=2000
         )
 
