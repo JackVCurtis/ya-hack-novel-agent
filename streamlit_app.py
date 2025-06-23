@@ -11,6 +11,7 @@ from pages.character_creation_page import CharacterCreationPage
 from pages.plot_summary_page import PlotSummaryPage
 from pages.story_outline_page import StoryOutlinePage
 from pages.chapter_writing_page import ChapterWritingPage
+from pages.reader_page import ReaderPage
 from pages.edit_content_page import EditContentPage
 
 
@@ -432,6 +433,9 @@ def main():
     elif current_step == "Chapter Writing":
         page = ChapterWritingPage()
         page.render()
+    elif current_step == "Reader":
+        page = ReaderPage()
+        page.render()
     elif current_step == "Edit Content":
         page = EditContentPage()
         page.render()
@@ -511,6 +515,13 @@ def render_navigation_header():
             "completed": bool(st.session_state.get('generated_chapters'))
         },
         {
+            "name": "Reader",
+            "icon": "📖",
+            "description": "Read your story",
+            "required": None,  # Available when story is complete
+            "completed": False  # Never marked as "completed"
+        },
+        {
             "name": "Edit Content",
             "icon": "✏️",
             "description": "Review and edit",
@@ -536,9 +547,11 @@ def render_navigation_header():
             if next_step["required"]:
                 is_available = bool(st.session_state.get(next_step["required"]))
             else:
-                # Story Concept is always available, Edit Content available if any content exists
+                # Story Concept is always available, Reader available when story complete, Edit Content available if any content exists
                 if next_step["name"] == "Story Concept":
                     is_available = True
+                elif next_step["name"] == "Reader":
+                    is_available = bool(st.session_state.get('generated_chapters'))
                 elif next_step["name"] == "Edit Content":
                     is_available = any([
                         st.session_state.get('story_concept'),
@@ -587,9 +600,11 @@ def render_navigation_header():
             if step["required"]:
                 is_available = bool(st.session_state.get(step["required"]))
             else:
-                # Story Concept is always available, Edit Content available if any content exists
+                # Story Concept is always available, Reader available when story complete, Edit Content available if any content exists
                 if step["name"] == "Story Concept":
                     is_available = True
+                elif step["name"] == "Reader":
+                    is_available = bool(st.session_state.get('generated_chapters'))
                 elif step["name"] == "Edit Content":
                     is_available = any([
                         st.session_state.get('story_concept'),
@@ -648,8 +663,8 @@ def render_navigation_header():
                 st.markdown(f"{step['icon']} {step['name']}")
 
     # Add progress indicator
-    completed_steps = sum(1 for step in steps[:-1] if step["completed"])  # Exclude "Edit Content"
-    total_steps = len(steps) - 1  # Exclude "Edit Content" from count
+    completed_steps = sum(1 for step in steps[:-2] if step["completed"])  # Exclude "Reader" and "Edit Content"
+    total_steps = len(steps) - 2  # Exclude "Reader" and "Edit Content" from count
     progress_percentage = (completed_steps / total_steps) * 100
 
     # Progress bar spanning full width
