@@ -73,7 +73,7 @@ class CharacterAgent(AbstractWriterAgent):
         return """CHARACTER DEVELOPMENT STYLE GUIDE:
 AVOID RUN-ON SENTENCES
 CHARACTER AUTHENTICITY:
-- Create three-dimensional characters that feel real and relatable to YA readers
+- Create three-dimensional characters that feel real and relatable 
 - Balance strengths and flaws to avoid Mary Sue/Gary Stu archetypes
 - Ensure characters have clear motivations, goals, and internal conflicts
 - Make characters age-appropriate while AVOIDING STEREOTYPES
@@ -87,7 +87,6 @@ DESCRIPTION STYLE:
 PERSONALITY DEVELOPMENT:
 - Create complex personalities with both positive and negative traits
 - Show how background and experiences shape character behavior
-- Include realistic teenage concerns, interests, and speech patterns
 - Develop unique voices and dialogue styles for each character
 
 RELATIONSHIP DYNAMICS:
@@ -218,10 +217,9 @@ Based on the above information, create a detailed character creation prompt that
 3. BACKGROUND & HISTORY: Personal history that shapes who they are
 4. GOALS & MOTIVATIONS: What drives them and what they want to achieve
 5. RELATIONSHIPS: How they relate to others and existing characters
-6. CHARACTER ARC POTENTIAL: How they can grow and change throughout the story
+6. CHARACTER ARC: How they grow and change throughout the story
 7. DIALOGUE VOICE: How they speak and express themselves
 8. ROLE-SPECIFIC ELEMENTS: How they fulfill their narrative function
-9. YA APPEAL: What makes them relatable and engaging to teenage readers
 
 Create a comprehensive prompt that will result in a detailed character profile that feels authentic, serves the story, and resonates with YA readers."""
 
@@ -265,13 +263,13 @@ CHARACTER PROFILE STRUCTURE:
 7. RELATIONSHIPS: How they relate to others, social dynamics
 8. VOICE & MANNERISMS: How they speak, distinctive behaviors, expressions
 
-Focus on creating a character that YA readers will connect with emotionally while serving the story effectively."""
+Focus on brevity; each section should be 1-2 sentences."""
 
         return self._make_api_call(
             system_content=character_creation_instructions,
             user_content=detailed_prompt,
             temperature=0.7,
-            max_tokens=3000
+            max_tokens=2000
         )
 
     def _create_prompt(self, novel_concept: str, setting_description: str,
@@ -305,7 +303,7 @@ Please create a comprehensive character profile that includes:
 4. STRENGTHS - Their talents, skills, and positive traits
 5. FLAWS & WEAKNESSES - Their shortcomings, bad habits, and areas for growth
 
-Make sure the character fits naturally into the provided setting and serves their narrative role effectively while being a complex, three-dimensional individual that YA readers can connect with."""
+Make sure the character fits naturally into the provided setting and serves their narrative role effectively. Avoid stereotypes and cliche, prefer to subvert expectations"""
 
         if character_description:
             prompt += """

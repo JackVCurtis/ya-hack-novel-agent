@@ -60,7 +60,8 @@ class ChapterAgent(AbstractWriterAgent):
         ENSURE THAT THE STORY BEATS OF THE CHAPTER SPECIFIED IN THE OUTLINE ARE ACCOMPLISHED
 
         WRITING STYLE GUIDELINES:
-        - Write in third person limited POV (unless specified otherwise)
+        - Write in third person limited POV from a SINGLE character's perspective throughout the entire chapter
+        - NEVER switch POV or create multiple sections - maintain one consistent viewpoint
         - Use age-appropriate language for 13-18 year old readers
         - Balance action, dialogue, and internal thoughts
         - Create authentic teenage voices and concerns
@@ -68,6 +69,7 @@ class ChapterAgent(AbstractWriterAgent):
         - Maintain consistent character voices
         - Show character growth and development
         - Integrate setting details naturally throughout
+        - Write as one continuous narrative without scene breaks or section divisions
         
         TECHNICAL REQUIREMENTS:
         - Aim for 2,000-3,500 words per chapter
@@ -94,21 +96,23 @@ NARRATIVE STRUCTURE:
 - End with falling action that resolves immediate tension while creating intrigue
 
 WRITING STYLE:
-- Use third person limited POV for intimate character connection
+- Use third person limited POV from ONE character's perspective for the entire chapter
+- NEVER switch POV or create multiple viewpoint sections within a chapter
 - Write 3,000-4,500 words per chapter for substantial content
 - Balance action, dialogue, and internal thoughts effectively
 - Create authentic teenage voices and concerns
+- Write as one continuous narrative without section breaks
 
 CHARACTER DEVELOPMENT:
-- Show character growth through actions and decisions
+- Show character growth through actions and decisions from the single POV character's perspective
 - Include meaningful dialogue that reveals personality
-- Demonstrate relationships and character dynamics
-- Allow characters to drive the plot through their choices
+- Demonstrate relationships and character dynamics as seen by the POV character
+- Allow the POV character to drive the plot through their choices and observations
 
 PACING AND FLOW:
 - Vary sentence structure and paragraph length for rhythm
-- Use scene breaks and transitions effectively
-- Maintain a fast and exciting pace
+- Create smooth transitions between events without scene breaks or section divisions
+- Maintain a fast and exciting pace through continuous narrative flow
 - Create compelling hooks and chapter endings
 
 EVOCATIVE AND ATMOSPHERIC DETAILS:
@@ -220,21 +224,24 @@ The new chapter should continue seamlessly from this point.
 {plot_summary_section}
 {previous_context}
 
-Based on the above information, create a detailed writing prompt that will result in a rich, engaging Chapter {chapter_number} that is 3,000-4,500 words long. The prompt should include:
+Based on the above information, create a detailed writing prompt that will result in a rich, engaging Chapter {chapter_number} that is 3,000-4,500 words long written as ONE CONTINUOUS NARRATIVE from a single character's POV. The prompt should include:
 
-1. SPECIFIC SCENE DETAILS: What exactly happens in this chapter, scene by scene
-2. CHARACTER DEVELOPMENT: How characters should grow or change
-3. DIALOGUE GUIDANCE: Key conversations that need to happen
-4. EVOCATIVE DETAILS: Specific atmospheric and elements to include
-5. PACING INSTRUCTIONS: How to structure the rising and falling action
-6. EMOTIONAL BEATS: What emotions should be evoked and when
-7. PLOT ADVANCEMENT: How this chapter moves the overall story forward
-8. {"PLOT SUMMARY ALIGNMENT: How to ensure the chapter aligns with and serves the overall plot summary" if plot_summary else "STORY COHERENCE: How to maintain consistency with the overall narrative"}
-9. CHAPTER ENDING: Specific guidance on how to end with impact
+1. NARRATIVE FLOW: What happens in this chapter as a continuous story from one character's perspective
+2. POV CHARACTER FOCUS: Which character's viewpoint should be used throughout the entire chapter
+3. CHARACTER DEVELOPMENT: How the POV character should grow or change
+4. DIALOGUE GUIDANCE: Key conversations that need to happen as experienced by the POV character
+5. EVOCATIVE DETAILS: Specific atmospheric elements the POV character notices and experiences
+6. PACING INSTRUCTIONS: How to structure the rising and falling action through the POV character's experience
+7. EMOTIONAL BEATS: What emotions should be evoked and when from the POV character's perspective
+8. PLOT ADVANCEMENT: How this chapter moves the overall story forward through the POV character's actions and observations
+9. {"PLOT SUMMARY ALIGNMENT: How to ensure the chapter aligns with and serves the overall plot summary" if plot_summary else "STORY COHERENCE: How to maintain consistency with the overall narrative"}
+10. CHAPTER ENDING: Specific guidance on how to end with impact from the POV character's perspective
 
-{"Ensure the chapter stays true to the plot summary while providing detailed scene-by-scene development." if plot_summary else ""}
+CRITICAL: Ensure the chapter is written as ONE CONTINUOUS NARRATIVE without scene breaks, section divisions, or POV switches. Everything should be experienced through a single character's perspective.
 
-Create a comprehensive prompt that will result in a substantial, well-developed chapter that feels authentic to the YA genre and advances both character and plot development significantly."""
+{"Ensure the chapter stays true to the plot summary while providing detailed continuous narrative development from one character's viewpoint." if plot_summary else ""}
+
+Create a comprehensive prompt that will result in a substantial, well-developed chapter that feels authentic to the YA genre and advances both character and plot development significantly through a single, unbroken narrative perspective."""
 
         return self._make_api_call(
             system_content="You are an expert writing coach who creates detailed prompts for writing compelling young adult fiction chapters.",
@@ -258,23 +265,36 @@ Create a comprehensive prompt that will result in a substantial, well-developed 
         """
         chapter_writing_instructions = """You are a professional young adult fiction writer. Your task is to write a complete, engaging chapter based on the detailed prompt provided.
 
+CRITICAL REQUIREMENTS:
+- Write exactly ONE CONTINUOUS CHAPTER from a SINGLE character's point of view
+- NEVER switch POV or create multiple sections within the chapter
+- NEVER use scene breaks, section dividers, or subsection headers
+- Write as one unbroken narrative flow from beginning to end
+
 WRITING REQUIREMENTS:
-- Write 3,000-4,500 words
-- Use third person limited POV
+- Write 3,000-4,500 words as one continuous narrative
+- Use third person limited POV from ONE character's perspective throughout
 - Create authentic teenage voices and concerns
-- Include rich details and atmospheric descriptions
-- Balance action, dialogue, and internal thoughts
-- Show character growth and development
+- Include rich details and atmospheric descriptions as seen by the POV character
+- Balance action, dialogue, and internal thoughts from the POV character's experience
+- Show character growth and development through the POV character's journey
 - Maintain appropriate pacing for YA readers
 - End with emotional impact or compelling hook
 
-CHAPTER STRUCTURE:
-1. EVOCATIVE OPENING (2-3 paragraphs): Begin with vivid details that immediately establish mood and atmosphere
-2. RISING ACTION (majority of chapter): Build tension progressively with character development and plot advancement
-3. CLIMAX/TURNING POINT: A significant moment of conflict, revelation, or change
-4. FALLING ACTION & RESOLUTION: Resolve immediate chapter tension while setting up future intrigue
+CHAPTER STRUCTURE (as one continuous narrative):
+1. EVOCATIVE OPENING (2-3 paragraphs): Begin with vivid details that immediately establish mood and atmosphere from the POV character's perspective
+2. RISING ACTION (majority of chapter): Build tension progressively with character development and plot advancement through the POV character's experience
+3. CLIMAX/TURNING POINT: A significant moment of conflict, revelation, or change as experienced by the POV character
+4. FALLING ACTION & RESOLUTION: Resolve immediate chapter tension while setting up future intrigue, all from the POV character's perspective
 
-Focus on creating a chapter that feels substantial, emotionally resonant, and advances both character and plot in meaningful ways."""
+ABSOLUTELY AVOID:
+- Multiple POV characters within the same chapter
+- Scene breaks or section divisions (like "***" or "---")
+- Subsection headers or chapter subdivisions
+- Switching between different characters' perspectives
+- Any formatting that breaks the narrative flow
+
+Focus on creating a chapter that feels substantial, emotionally resonant, and advances both character and plot in meaningful ways through ONE character's continuous experience."""
 
         return self._make_api_call(
             system_content=chapter_writing_instructions,
@@ -318,22 +338,24 @@ CHARACTERS:
 {previous_context}
 
 CHAPTER STRUCTURE REQUIREMENTS:
-1. Begin with 1-2 paragraphs of description that sets the mood and atmosphere
-2. Build rising action that follows the outline while developing characters and advancing plot
-3. Include meaningful dialogue and character interactions
-4. End with falling action that resolves the chapter's immediate conflict while setting up future intrigue
+1. Begin with 1-2 paragraphs of description that sets the mood and atmosphere from ONE character's perspective
+2. Build rising action that follows the outline while developing characters and advancing plot through ONE character's experience
+3. Include meaningful dialogue and character interactions as experienced by the POV character
+4. End with falling action that resolves the chapter's immediate conflict while setting up future intrigue, all from the same character's perspective
 
-WRITING GUIDELINES:
-- Write 2,000-3,500 words
-- Use third person limited POV
+CRITICAL WRITING GUIDELINES:
+- Write 2,000-3,500 words as ONE CONTINUOUS NARRATIVE
+- Use third person limited POV from a SINGLE character throughout the entire chapter
+- NEVER switch POV or create multiple sections within the chapter
+- NEVER use scene breaks, section dividers, or subsection headers
 - Create authentic YA voices and concerns
-- Balance action, dialogue, and internal thoughts
-- Show character growth and development
-- Integrate setting details naturally
+- Balance action, dialogue, and internal thoughts from the POV character's perspective
+- Show character growth and development through the POV character's journey
+- Integrate setting details naturally as noticed by the POV character
 - Maintain appropriate pacing for teenage readers
 - End with impact (emotional resonance or compelling hook)
 
-Please write the complete chapter now."""
+Write the complete chapter as one unbroken narrative from a single character's point of view."""
     
     def write_chapter_with_specific_pov(self, chapter_outline: str, characters: Dict[str, str],
                                        setting_description: str, chapter_number: int,
@@ -417,18 +439,21 @@ The new chapter should continue seamlessly from this point.
 POV CHARACTER: {pov_character.upper()}
 {previous_context}
 
-Create a detailed writing prompt that will result in a rich, engaging Chapter {chapter_number} (3,000-4,500 words) written entirely from {pov_character}'s perspective. The prompt should include:
+Create a detailed writing prompt that will result in a rich, engaging Chapter {chapter_number} (3,000-4,500 words) written as ONE CONTINUOUS NARRATIVE entirely from {pov_character}'s perspective without any POV switches or section breaks. The prompt should include:
 
-1. POV-SPECIFIC SCENE DETAILS: What {pov_character} experiences, sees, thinks, and feels
-2. INTERNAL MONOLOGUE GUIDANCE: {pov_character}'s thoughts, reactions, and emotional journey
-3. DIALOGUE FROM POV: How {pov_character} speaks and interprets others' words
-4. EVOCATIVE EXPERIENCE: What {pov_character} specifically notices through their senses
-5. CHARACTER VOICE: How to capture {pov_character}'s unique personality and speech patterns
-6. EMOTIONAL BEATS: {pov_character}'s emotional arc throughout the chapter
-7. RELATIONSHIP DYNAMICS: How {pov_character} views and interacts with other characters
-8. PLOT ADVANCEMENT: How events unfold from {pov_character}'s limited perspective
+1. CONTINUOUS NARRATIVE FLOW: How {pov_character} experiences the entire chapter as one unbroken story
+2. POV-SPECIFIC EXPERIENCE: What {pov_character} experiences, sees, thinks, and feels throughout the chapter
+3. INTERNAL MONOLOGUE GUIDANCE: {pov_character}'s thoughts, reactions, and emotional journey
+4. DIALOGUE FROM POV: How {pov_character} speaks and interprets others' words
+5. EVOCATIVE EXPERIENCE: What {pov_character} specifically notices through their senses
+6. CHARACTER VOICE: How to capture {pov_character}'s unique personality and speech patterns consistently
+7. EMOTIONAL BEATS: {pov_character}'s emotional arc throughout the chapter
+8. RELATIONSHIP DYNAMICS: How {pov_character} views and interacts with other characters
+9. PLOT ADVANCEMENT: How events unfold from {pov_character}'s limited perspective
 
-Ensure the prompt will create a chapter that feels authentic to {pov_character}'s voice while advancing the overall story."""
+CRITICAL: Ensure the prompt emphasizes that the chapter must be written as ONE CONTINUOUS NARRATIVE from {pov_character}'s perspective only, with NO scene breaks, section divisions, or POV switches. Everything should flow as one unbroken story from {pov_character}'s viewpoint.
+
+Ensure the prompt will create a chapter that feels authentic to {pov_character}'s voice while advancing the overall story through their singular perspective."""
 
         return self._make_api_call(
             system_content="You are an expert writing coach who creates detailed prompts for POV-specific young adult fiction chapters.",
